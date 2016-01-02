@@ -12,26 +12,25 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArraySet;
 
-import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 
 import org.eclipse.smarthome.automation.handler.ModuleHandlerFactory;
+import org.eclipse.smarthome.automation.module.script.ScriptEngineProvider;
+import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider;
 import org.eclipse.smarthome.automation.module.script.ScriptScopeProvider;
 import org.eclipse.smarthome.automation.module.script.internal.factory.ScriptModuleHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.internal.handler.AbstractScriptModuleHandler;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
+import org.osgi.framework.Filter;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.util.tracker.ServiceTracker;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Joiner;
 
 /**
  * ScriptModuleActivator class for script automation modules
@@ -72,42 +71,47 @@ public class ScriptModuleActivator implements BundleActivator {
         this.moduleHandlerFactory.activate(context);
         this.factoryRegistration = bundleContext.registerService(ModuleHandlerFactory.class.getName(),
                 this.moduleHandlerFactory, null);
-        scriptScopeProviders = new CopyOnWriteArraySet<ScriptScopeProvider>();
-        scriptScopeProviderServiceTracker = new ServiceTracker(bundleContext, ScriptScopeProvider.class.getName(),
-                new ServiceTrackerCustomizer() {
 
-                    @Override
-                    public Object addingService(ServiceReference reference) {
-                        Object service = bundleContext.getService(reference);
-                        if (service instanceof ScriptScopeProvider) {
-                            ScriptScopeProvider provider = (ScriptScopeProvider) service;
-                            scriptScopeProviders.add(provider);
-                            for (ScriptEngine engine : engines.values()) {
-                                initializeGeneralScope(engine, provider);
-                            }
-                            return service;
-                        } else {
-                            return null;
-                        }
-                    }
+        Filter filter = bundleContext.createFilter("(|(objectClass=" + ScriptScopeProvider.class.getName()
+                + ")(objectClass=" + ScriptExtensionProvider.class.getName() + "))");
 
-                    @Override
-                    public void modifiedService(ServiceReference reference, Object service) {
-                    }
+        scriptScopeProviderServiceTracker = new ServiceTracker(bundleContext, filter, new ServiceTrackerCustomizer() {
 
-                    @Override
-                    public void removedService(ServiceReference reference, Object service) {
-                        if (service instanceof ScriptScopeProvider) {
-                            ScriptScopeProvider provider = (ScriptScopeProvider) service;
-                            scriptScopeProviders.remove(provider);
-                            for (ScriptEngine engine : engines.values()) {
-                                for (String key : provider.getScopeElements().keySet()) {
-                                    engine.getBindings(ScriptContext.ENGINE_SCOPE).remove(key);
-                                }
-                            }
-                        }
-                    }
-                });
+            @Override
+            public Object addingService(ServiceReference reference) {
+                Object service = bundleContext.getService(reference);
+                if (service instanceof ScriptScopeProvider) {
+                    ScriptScopeProvider provider = (ScriptScopeProvider) service;
+
+                    ScriptEngineProvider.addScopeProvider(provider);
+                    return service;
+                } else if (service instanceof ScriptExtensionProvider) {
+                    ScriptExtensionProvider provider = (ScriptExtensionProvider) service;
+
+                    ScriptExtensionManager.addScriptExtensionProvider(provider);
+                    return service;
+                } else {
+                    return null;
+                }
+            }
+
+            @Override
+            public void modifiedService(ServiceReference reference, Object service) {
+            }
+
+            @Override
+            public void removedService(ServiceReference reference, Object service) {
+                if (service instanceof ScriptScopeProvider) {
+                    ScriptScopeProvider provider = (ScriptScopeProvider) service;
+                    ScriptEngineProvider.removeScopeProvider(provider);
+                } else if (service instanceof ScriptExtensionProvider) {
+                    ScriptExtensionProvider provider = (ScriptExtensionProvider) service;
+
+                    ScriptExtensionManager.removeScriptExtensionProvider(provider);
+                }
+            }
+        });
+
         scriptScopeProviderServiceTracker.open();
 
         logger.debug("Started script automation support");
@@ -128,9 +132,7 @@ public class ScriptModuleActivator implements BundleActivator {
         }
         this.moduleHandlerFactory = null;
         this.scriptScopeProviderServiceTracker.close();
-        ScriptModuleActivator.scriptScopeProviders.clear();
-        ScriptModuleActivator.scriptScopeProviders = null;
-
+        ScriptEngineProvider.clearProviders();
     }
 
     /**
@@ -224,7 +226,8 @@ public class ScriptModuleActivator implements BundleActivator {
                 engine.put(entry.getKey(), entry.getValue());
             }
         }
-        String scriptToEval = Joiner.on(",\n").join(expressions);
+
+        String scriptToEval = String.join(",\n", expressions);
         try {
             engine.eval(scriptToEval);
         } catch (Exception e) {

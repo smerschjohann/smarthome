@@ -5,8 +5,7 @@ Bundle-SymbolicName: org.eclipse.smarthome.automation.module.script
 Bundle-Version: 0.9.0.qualifier
 Bundle-Activator: org.eclipse.smarthome.automation.module.script.internal.ScriptModuleActivator
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
-Import-Package: com.google.common.base,
- javax.script,
+Import-Package: javax.script,
  org.eclipse.smarthome.automation,
  org.eclipse.smarthome.automation.handler,
  org.eclipse.smarthome.automation.module.script,
