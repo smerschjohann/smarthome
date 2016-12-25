@@ -32,6 +32,7 @@ import org.eclipse.smarthome.automation.module.script.extensions.rulesupport.int
 import org.eclipse.smarthome.automation.module.script.extensions.rulesupport.internal.shared.simple.SimpleConditionHandler;
 import org.eclipse.smarthome.automation.type.ModuleType;
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
+import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceRegistration;
@@ -133,7 +134,7 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
         modulesTypes.put(moduleType.getUID(), moduleType);
 
         Hashtable<String, Object> properties = new Hashtable<String, Object>();
-        properties.put(REG_PROPERTY_MODULE_TYPES, modulesTypes.keySet());
+        properties.put("modules", modulesTypes.keySet());
         if (mtpReg == null) {
             mtpReg = bundleContext.registerService(ModuleTypeProvider.class.getName(), this, properties);
         } else {
@@ -199,11 +200,29 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
         bmhfReg.setProperties(properties);
 
         properties = new Hashtable<String, Object>();
-        properties.put(REG_PROPERTY_MODULE_TYPES, modulesTypes.keySet());
+        properties.put("modules", modulesTypes.keySet());
         if (mtpReg == null) {
             mtpReg = bundleContext.registerService(ModuleTypeProvider.class.getName(), this, properties);
         } else {
             mtpReg.setProperties(properties);
         }
+    }
+
+    @Override
+    public Collection<ModuleType> getAll() {
+        return modulesTypes.values();
+
+    }
+
+    @Override
+    public void addProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void removeProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
+        // TODO Auto-generated method stub
+
     }
 }
