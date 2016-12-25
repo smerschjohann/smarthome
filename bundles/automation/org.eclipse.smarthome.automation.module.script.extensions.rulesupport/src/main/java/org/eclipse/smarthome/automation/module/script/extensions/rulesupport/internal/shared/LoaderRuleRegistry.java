@@ -9,10 +9,10 @@ package org.eclipse.smarthome.automation.module.script.extensions.rulesupport.in
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Set;
 
 import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
+import org.eclipse.smarthome.automation.RuleStatus;
 import org.eclipse.smarthome.automation.RuleStatusInfo;
 import org.eclipse.smarthome.automation.module.script.extensions.rulesupport.internal.RuleSupportActivator;
 import org.eclipse.smarthome.core.common.registry.RegistryChangeListener;
@@ -91,18 +91,8 @@ public class LoaderRuleRegistry implements RuleRegistry {
     }
 
     @Override
-    public Collection<Rule> getByTags(Set<String> tags) {
-        return ruleRegistry.getByTags(tags);
-    }
-
-    @Override
     public void setEnabled(String uid, boolean isEnabled) {
         ruleRegistry.setEnabled(uid, isEnabled);
-    }
-
-    @Override
-    public RuleStatusInfo getStatus(String ruleUID) {
-        return ruleRegistry.getStatus(ruleUID);
     }
 
     @Override
@@ -122,6 +112,21 @@ public class LoaderRuleRegistry implements RuleRegistry {
             }
         }
         rules.clear();
+    }
+
+    @Override
+    public Collection<Rule> getByTags(String... tags) {
+        return ruleRegistry.getByTags(tags);
+    }
+
+    @Override
+    public RuleStatusInfo getStatusInfo(String ruleUID) {
+        return ruleRegistry.getStatusInfo(ruleUID);
+    }
+
+    @Override
+    public RuleStatus getStatus(String ruleUID) {
+        return ruleRegistry.getStatus(ruleUID);
     }
 
 }
