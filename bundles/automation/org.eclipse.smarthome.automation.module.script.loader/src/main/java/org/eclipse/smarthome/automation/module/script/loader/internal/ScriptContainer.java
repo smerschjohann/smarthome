@@ -1,4 +1,4 @@
-package org.eclipse.smarthome.automation.module.script;
+package org.eclipse.smarthome.automation.module.script.loader.internal;
 
 import java.net.URL;
 

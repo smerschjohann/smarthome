@@ -14,12 +14,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import javax.script.ScriptEngine;
 
-import org.eclipse.smarthome.automation.module.script.ScriptContainer;
 import org.eclipse.smarthome.automation.module.script.ScriptManager;
+import org.eclipse.smarthome.automation.module.script.loader.internal.ScriptContainer;
 import org.eclipse.smarthome.automation.provider.file.AbstractFileProvider;
 
-public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptContainer>
-        implements org.eclipse.smarthome.automation.module.script.ScriptProvider {
+public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptContainer> {
 
     protected static final long RECHECK_INTERVAL = 30 * 1000;
 

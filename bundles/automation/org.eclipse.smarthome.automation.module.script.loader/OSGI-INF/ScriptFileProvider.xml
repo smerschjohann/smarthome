@@ -12,7 +12,4 @@
     name="org.eclipse.smarthome.automation.module.script.loader.internal.file.ScriptFileProviderWatcher">
     <implementation class="org.eclipse.smarthome.automation.module.script.loader.internal.file.ScriptFileProviderWatcher" />
     <reference bind="setScriptManager" cardinality="1..1" interface="org.eclipse.smarthome.automation.module.script.ScriptManager" name="ScriptManager" policy="static" />
-    <service>
-         <provide interface="org.eclipse.smarthome.automation.module.script.ScriptProvider" />
-    </service>
 </scr:component>
