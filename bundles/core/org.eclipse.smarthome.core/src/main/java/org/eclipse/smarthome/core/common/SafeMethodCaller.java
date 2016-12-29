@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2016 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,6 +7,8 @@
  */
 package org.eclipse.smarthome.core.common;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -186,8 +188,14 @@ public class SafeMethodCaller {
             return future.get(timeout, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             if (wrapper.getThread() != null) {
-                Thread thread = wrapper.getThread();
-                StackTraceElement element = thread.getStackTrace()[0];
+                final Thread thread = wrapper.getThread();
+                StackTraceElement element = AccessController.doPrivileged(new PrivilegedAction<StackTraceElement>() {
+
+                    @Override
+                    public StackTraceElement run() {
+                        return thread.getStackTrace()[0];
+                    }
+                });
                 getLogger().debug("Timeout of {}ms exceeded, thread {} ({}) in state {} is at {}.{}({}:{}).", timeout,
                         thread.getName(), thread.getId(), thread.getState().toString(), element.getClassName(),
                         element.getMethodName(), element.getFileName(), element.getLineNumber());

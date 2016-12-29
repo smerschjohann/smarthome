@@ -17,6 +17,7 @@
 
   <modules>
     <module>org.eclipse.smarthome.core</module>
+    <module>org.eclipse.smarthome.core.audio</module>
     <module>org.eclipse.smarthome.core.autoupdate</module>
     <module>org.eclipse.smarthome.core.extension.sample</module>
     <module>org.eclipse.smarthome.core.id</module>
@@ -31,6 +32,8 @@
     <module>org.eclipse.smarthome.core.binding.xml.test</module>
     <module>org.eclipse.smarthome.core.thing.xml</module>
     <module>org.eclipse.smarthome.core.thing.xml.test</module>
+    <module>org.eclipse.smarthome.core.voice</module>
+    <module>org.eclipse.smarthome.core.voice.test</module>
   </modules>
 
 </project>

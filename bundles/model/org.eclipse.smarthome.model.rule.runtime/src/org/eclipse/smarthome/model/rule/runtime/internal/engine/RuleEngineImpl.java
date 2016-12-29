@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,20 +12,25 @@ import static org.eclipse.smarthome.model.rule.runtime.internal.engine.RuleTrigg
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.emf.ecore.EObject;
+import org.eclipse.smarthome.core.events.Event;
+import org.eclipse.smarthome.core.events.EventFilter;
+import org.eclipse.smarthome.core.events.EventSubscriber;
 import org.eclipse.smarthome.core.items.GenericItem;
 import org.eclipse.smarthome.core.items.Item;
 import org.eclipse.smarthome.core.items.ItemNotFoundException;
 import org.eclipse.smarthome.core.items.ItemRegistry;
 import org.eclipse.smarthome.core.items.ItemRegistryChangeListener;
 import org.eclipse.smarthome.core.items.StateChangeListener;
-import org.eclipse.smarthome.core.items.events.AbstractItemEventSubscriber;
 import org.eclipse.smarthome.core.items.events.ItemCommandEvent;
+import org.eclipse.smarthome.core.items.events.ItemStateEvent;
+import org.eclipse.smarthome.core.thing.events.ChannelTriggeredEvent;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.model.core.ModelRepository;
@@ -35,7 +40,6 @@ import org.eclipse.smarthome.model.rule.jvmmodel.RulesJvmModelInferrer;
 import org.eclipse.smarthome.model.rule.rules.Rule;
 import org.eclipse.smarthome.model.rule.rules.RuleModel;
 import org.eclipse.smarthome.model.rule.runtime.RuleEngine;
-import org.eclipse.smarthome.model.rule.runtime.RuleRuntime;
 import org.eclipse.smarthome.model.script.engine.Script;
 import org.eclipse.smarthome.model.script.engine.ScriptEngine;
 import org.eclipse.smarthome.model.script.engine.ScriptExecutionException;
@@ -44,11 +48,12 @@ import org.eclipse.xtext.naming.QualifiedName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.inject.Injector;
 
 /**
- * This class is the core of the openHAB rule engine.
+ * This class is the core of the Eclipse SmartHome rule engine.
  * It listens to changes to the rules folder, evaluates the trigger conditions of the rules and
  * schedules them for execution dependent on their triggering conditions.
  *
@@ -57,8 +62,8 @@ import com.google.inject.Injector;
  *
  */
 @SuppressWarnings("restriction")
-public class RuleEngineImpl extends AbstractItemEventSubscriber
-        implements ItemRegistryChangeListener, StateChangeListener, ModelRepositoryChangeListener, RuleEngine {
+public class RuleEngineImpl implements ItemRegistryChangeListener, StateChangeListener, ModelRepositoryChangeListener,
+        RuleEngine, EventSubscriber {
 
     private final Logger logger = LoggerFactory.getLogger(RuleEngineImpl.class);
 
@@ -67,13 +72,16 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
     private ItemRegistry itemRegistry;
     private ModelRepository modelRepository;
     private ScriptEngine scriptEngine;
-    private RuleRuntime ruleRuntime;
 
     private RuleTriggerManager triggerManager;
 
     private Injector injector;
 
     private ScheduledFuture<?> startupJob;
+
+    // this flag is used to signal that items are still being added and that we hence do not consider the rule engine
+    // ready to be operational
+    private boolean starting = true;
 
     private Runnable startupRunnable = new Runnable() {
         @Override
@@ -104,6 +112,10 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
             }
         }
 
+        // register us as listeners
+        itemRegistry.addRegistryChangeListener(this);
+        modelRepository.addModelRepositoryChangeListener(this);
+
         // register us on all items which are already available in the registry
         for (Item item : itemRegistry.getItems()) {
             internalItemAdded(item);
@@ -112,6 +124,13 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
     }
 
     public void deactivate() {
+        // unregister listeners
+        for (Item item : itemRegistry.getItems()) {
+            internalItemRemoved(item);
+        }
+        modelRepository.removeModelRepositoryChangeListener(this);
+        itemRegistry.removeRegistryChangeListener(this);
+
         // execute all scripts that were registered for system shutdown
         executeRules(triggerManager.getRules(SHUTDOWN));
         triggerManager.clearAll();
@@ -120,21 +139,17 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
 
     public void setItemRegistry(ItemRegistry itemRegistry) {
         this.itemRegistry = itemRegistry;
-        itemRegistry.addRegistryChangeListener(this);
     }
 
     public void unsetItemRegistry(ItemRegistry itemRegistry) {
-        itemRegistry.removeRegistryChangeListener(this);
         this.itemRegistry = null;
     }
 
     public void setModelRepository(ModelRepository modelRepository) {
         this.modelRepository = modelRepository;
-        modelRepository.addModelRepositoryChangeListener(this);
     }
 
     public void unsetModelRepository(ModelRepository modelRepository) {
-        modelRepository.removeModelRepositoryChangeListener(this);
         this.modelRepository = null;
     }
 
@@ -146,17 +161,6 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
         this.scriptEngine = null;
     }
 
-    protected void setRuleRuntime(final RuleRuntime ruleRuntime) {
-        this.ruleRuntime = ruleRuntime;
-    }
-
-    protected void unsetRuleRuntime(final RuleRuntime ruleRuntime) {
-        this.ruleRuntime = null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void allItemsChanged(Collection<String> oldItemNames) {
         // add the current items again
@@ -167,52 +171,36 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
         scheduleStartupRules();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void added(Item item) {
         internalItemAdded(item);
         scheduleStartupRules();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void removed(Item item) {
-        if (item instanceof GenericItem) {
-            GenericItem genericItem = (GenericItem) item;
-            genericItem.removeStateChangeListener(this);
-        }
+        internalItemRemoved(item);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void stateChanged(Item item, State oldState, State newState) {
-        if (triggerManager != null) {
+        if (!starting && triggerManager != null) {
             Iterable<Rule> rules = triggerManager.getRules(CHANGE, item, oldState, newState);
 
             executeRules(rules, oldState);
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void stateUpdated(Item item, State state) {
-        if (triggerManager != null) {
+        if (!starting && triggerManager != null) {
             Iterable<Rule> rules = triggerManager.getRules(UPDATE, item, state);
             executeRules(rules);
         }
     }
 
-    @Override
-    protected void receiveCommand(ItemCommandEvent commandEvent) {
-        if (triggerManager != null && itemRegistry != null) {
+    private void receiveCommand(ItemCommandEvent commandEvent) {
+        if (!starting && triggerManager != null && itemRegistry != null) {
             String itemName = commandEvent.getItemName();
             Command command = commandEvent.getItemCommand();
             try {
@@ -226,10 +214,25 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
         }
     }
 
+    private void receiveThingTrigger(ChannelTriggeredEvent event) {
+        String triggerEvent = event.getEvent();
+        String channel = event.getChannel().getAsString();
+
+        Iterable<Rule> rules = triggerManager.getRules(TRIGGER, channel, triggerEvent);
+        executeRules(rules, event);
+    }
+
     private void internalItemAdded(Item item) {
         if (item instanceof GenericItem) {
             GenericItem genericItem = (GenericItem) item;
             genericItem.addStateChangeListener(this);
+        }
+    }
+
+    private void internalItemRemoved(Item item) {
+        if (item instanceof GenericItem) {
+            GenericItem genericItem = (GenericItem) item;
+            genericItem.removeStateChangeListener(this);
         }
     }
 
@@ -257,9 +260,10 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
     }
 
     private void scheduleStartupRules() {
-        if (startupJob == null || startupJob.isCancelled() || startupJob.isDone()) {
-            startupJob = scheduler.schedule(startupRunnable, 5, TimeUnit.SECONDS);
+        if (startupJob != null && !startupJob.isCancelled() && !startupJob.isDone()) {
+            startupJob.cancel(true);
         }
+        startupJob = scheduler.schedule(startupRunnable, 5, TimeUnit.SECONDS);
     }
 
     private void runStartupRules() {
@@ -281,19 +285,18 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
                                 new Object[] { rule.getName(), e.getCause().getMessage() });
                         executedRules.add(rule);
                     } else {
-                        logger.debug("Execution of startup rule '{}' has been postponed as items are still missing.",
-                                rule.getName());
+                        logger.debug("Execution of startup rule '{}' has been postponed as items are still missing: {}",
+                                rule.getName(), e.getMessage());
                     }
                 }
             }
             for (Rule rule : executedRules) {
                 triggerManager.removeRule(STARTUP, rule);
             }
+            // now that we have executed the startup rules, we are ready for others as well
+            starting = false;
+            triggerManager.startTimerRuleExecution();
         }
-    }
-
-    protected synchronized void executeRule(Rule rule) {
-        executeRule(rule, new RuleEvaluationContext());
     }
 
     protected synchronized void executeRule(Rule rule, RuleEvaluationContext context) {
@@ -310,6 +313,14 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
     protected synchronized void executeRules(Iterable<Rule> rules) {
         for (Rule rule : rules) {
             RuleEvaluationContext context = new RuleEvaluationContext();
+            executeRule(rule, context);
+        }
+    }
+
+    protected synchronized void executeRules(Iterable<Rule> rules, ChannelTriggeredEvent event) {
+        for (Rule rule : rules) {
+            RuleEvaluationContext context = new RuleEvaluationContext();
+            context.newValue(QualifiedName.create(RulesJvmModelInferrer.VAR_RECEIVED_EVENT), event);
             executeRule(rule, context);
         }
     }
@@ -331,8 +342,8 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
     }
 
     /**
-     * we need to be able to deactivate the rule execution, otherwise the openHAB designer
-     * would also execute the rules.
+     * we need to be able to deactivate the rule execution, otherwise the Eclipse SmartHome designer would also execute
+     * the rules.
      *
      * @return true, if rules should be executed, false otherwise
      */
@@ -344,5 +355,27 @@ public class RuleEngineImpl extends AbstractItemEventSubscriber
     public void updated(Item oldItem, Item item) {
         removed(oldItem);
         added(item);
+    }
+
+    private final Set<String> subscribedEventTypes = ImmutableSet.of(ItemStateEvent.TYPE, ItemCommandEvent.TYPE,
+            ChannelTriggeredEvent.TYPE);
+
+    @Override
+    public Set<String> getSubscribedEventTypes() {
+        return subscribedEventTypes;
+    }
+
+    @Override
+    public EventFilter getEventFilter() {
+        return null;
+    }
+
+    @Override
+    public void receive(Event event) {
+        if (event instanceof ItemCommandEvent) {
+            receiveCommand((ItemCommandEvent) event);
+        } else if (event instanceof ChannelTriggeredEvent) {
+            receiveThingTrigger((ChannelTriggeredEvent) event);
+        }
     }
 }

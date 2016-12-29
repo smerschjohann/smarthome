@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -28,7 +28,7 @@ public class NtpBindingConstants {
 
     // List of all Channel ids
     public final static String CHANNEL_DATE_TIME = "dateTime";
-    public final static String CHANNEL_STING = "string";
+    public final static String CHANNEL_STRING = "string";
 
     // Custom Properties
     public final static String PROPERTY_NTP_SERVER = "hostname";

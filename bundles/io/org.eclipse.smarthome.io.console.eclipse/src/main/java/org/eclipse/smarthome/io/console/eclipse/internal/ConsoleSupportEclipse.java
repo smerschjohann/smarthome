@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -24,7 +24,7 @@ import org.eclipse.smarthome.io.console.ConsoleInterpreter;
 import org.eclipse.smarthome.io.console.extensions.ConsoleCommandExtension;
 
 /**
- * This class provides access to openHAB functionality through the OSGi console
+ * This class provides access to Eclipse SmartHome functionality through the OSGi console
  * of Equinox. Unfortunately, there these command providers are not standardized
  * for OSGi, so we need different implementations for different OSGi containers.
  *

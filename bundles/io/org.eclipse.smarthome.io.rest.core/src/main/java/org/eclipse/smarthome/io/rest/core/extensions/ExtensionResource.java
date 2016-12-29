@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@ package org.eclipse.smarthome.io.rest.core.extensions;
 import java.util.List;
 import java.util.Locale;
 
+import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
@@ -21,14 +22,16 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.eclipse.smarthome.core.auth.Role;
 import org.eclipse.smarthome.core.common.ThreadPoolManager;
 import org.eclipse.smarthome.core.events.Event;
 import org.eclipse.smarthome.core.events.EventPublisher;
 import org.eclipse.smarthome.core.extension.Extension;
+import org.eclipse.smarthome.core.extension.ExtensionEventFactory;
 import org.eclipse.smarthome.core.extension.ExtensionService;
 import org.eclipse.smarthome.core.extension.ExtensionType;
 import org.eclipse.smarthome.io.rest.LocaleUtil;
-import org.eclipse.smarthome.io.rest.RESTResource;
+import org.eclipse.smarthome.io.rest.SatisfiableRESTResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +47,9 @@ import io.swagger.annotations.ApiResponses;
  * @author Kai Kreuzer - Initial contribution and API
  */
 @Path(ExtensionResource.PATH_EXTENSIONS)
+@RolesAllowed({ Role.ADMIN })
 @Api(value = ExtensionResource.PATH_EXTENSIONS)
-public class ExtensionResource implements RESTResource {
+public class ExtensionResource implements SatisfiableRESTResource {
 
     private static final String THREAD_POOL_NAME = "extensionService";
 
@@ -125,7 +129,6 @@ public class ExtensionResource implements RESTResource {
             public void run() {
                 try {
                     extensionService.install(extensionId);
-                    postInstalledEvent(extensionId);
                 } catch (Exception e) {
                     logger.error("Exception while installing extension: {}", e.getMessage());
                     postFailureEvent(extensionId, e.getMessage());
@@ -145,7 +148,6 @@ public class ExtensionResource implements RESTResource {
             public void run() {
                 try {
                     extensionService.uninstall(extensionId);
-                    postUninstalledEvent(extensionId);
                 } catch (Exception e) {
                     logger.error("Exception while uninstalling extension: {}", e.getMessage());
                     postFailureEvent(extensionId, e.getMessage());
@@ -155,25 +157,16 @@ public class ExtensionResource implements RESTResource {
         return Response.ok().build();
     }
 
-    private void postInstalledEvent(String extensionId) {
-        if (eventPublisher != null) {
-            Event event = ExtensionEventFactory.createExtensionInstalledEvent(extensionId);
-            eventPublisher.post(event);
-        }
-    }
-
-    private void postUninstalledEvent(String extensionId) {
-        if (eventPublisher != null) {
-            Event event = ExtensionEventFactory.createExtensionUninstalledEvent(extensionId);
-            eventPublisher.post(event);
-        }
-    }
-
     private void postFailureEvent(String extensionId, String msg) {
         if (eventPublisher != null) {
             Event event = ExtensionEventFactory.createExtensionFailureEvent(extensionId, msg);
             eventPublisher.post(event);
         }
+    }
+
+    @Override
+    public boolean isSatisfied() {
+        return extensionService != null;
     }
 
 }

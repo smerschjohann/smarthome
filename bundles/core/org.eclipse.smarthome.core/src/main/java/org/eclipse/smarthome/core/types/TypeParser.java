@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,12 +12,40 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 /**
- * This is a helper class that helps parsing a string into an openHAB type (state or command).
+ * This is a helper class that helps parsing a string into an Eclipse SmartHome type (state or command).
  *
  * @author Kai Kreuzer - Initial contribution and API
  *
  */
-public class TypeParser {
+public final class TypeParser {
+
+    /**
+     * No instances allowed.
+     */
+    private TypeParser() {
+    }
+
+    private static final String CORE_LIBRARY_PACKAGE = "org.eclipse.smarthome.core.library.types.";
+
+    /**
+     * Parses a string into a type.
+     *
+     * @param typeName name of the type, for example StringType.
+     * @param input input string to parse.
+     * @return Parsed type or null, if the type couldn't be parsed.
+     */
+    public static Type parseType(String typeName, String input) {
+        try {
+            Class<?> stateClass = Class.forName(CORE_LIBRARY_PACKAGE + typeName);
+            Method valueOfMethod = stateClass.getMethod("valueOf", String.class);
+            return (Type) valueOfMethod.invoke(stateClass, input);
+        } catch (ClassNotFoundException e) {
+        } catch (NoSuchMethodException e) {
+        } catch (IllegalAccessException e) {
+        } catch (InvocationTargetException e) {
+        }
+        return null;
+    }
 
     /**
      * <p>
@@ -28,7 +56,7 @@ public class TypeParser {
      * Example: The type list is OnOffType.class,StringType.class. The string "ON" is now accepted by the OnOffType and
      * thus OnOffType.ON will be returned (and not a StringType with value "ON").
      * </p>
-     * 
+     *
      * @param types possible types of the state to consider
      * @param s the string to parse
      * @return the corresponding State instance or <code>null</code>
@@ -38,8 +66,9 @@ public class TypeParser {
             try {
                 Method valueOf = type.getMethod("valueOf", String.class);
                 State state = (State) valueOf.invoke(type, s);
-                if (state != null)
+                if (state != null) {
                     return state;
+                }
             } catch (NoSuchMethodException e) {
             } catch (IllegalArgumentException e) {
             } catch (IllegalAccessException e) {
@@ -58,7 +87,7 @@ public class TypeParser {
      * Example: The type list is OnOffType.class,StringType.class. The string "ON" is now accepted by the OnOffType and
      * thus OnOffType.ON will be returned (and not a StringType with value "ON").
      * </p>
-     * 
+     *
      * @param types possible types of the command to consider
      * @param s the string to parse
      * @return the corresponding Command instance or <code>null</code>
@@ -68,8 +97,9 @@ public class TypeParser {
             try {
                 Method valueOf = type.getMethod("valueOf", String.class);
                 Command value = (Command) valueOf.invoke(type, s);
-                if (value != null)
+                if (value != null) {
                     return value;
+                }
             } catch (NoSuchMethodException e) {
             } catch (IllegalArgumentException e) {
             } catch (IllegalAccessException e) {

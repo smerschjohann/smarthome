@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledFuture;
@@ -40,6 +41,7 @@ import org.eclipse.smarthome.core.common.ThreadPoolManager;
 import org.eclipse.smarthome.core.events.EventPublisher;
 import org.eclipse.smarthome.core.storage.Storage;
 import org.eclipse.smarthome.core.storage.StorageService;
+import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.ManagedThingProvider;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingRegistry;
@@ -124,6 +126,8 @@ public final class PersistentInbox implements Inbox, DiscoveryListener, ThingReg
     private ConfigDescriptionRegistry configDescRegistry;
 
     private Storage<DiscoveryResult> discoveryResultStorage;
+
+    private Map<DiscoveryResult, Class<?>> resultDiscovererMap = new ConcurrentHashMap<>();
 
     private ScheduledFuture<?> timeToLiveChecker;
 
@@ -268,6 +272,7 @@ public final class PersistentInbox implements Inbox, DiscoveryListener, ThingReg
                 if (!isInRegistry(thingUID)) {
                     removeResultsForBridge(thingUID);
                 }
+                resultDiscovererMap.remove(discoveryResult);
                 this.discoveryResultStorage.remove(thingUID.toString());
                 notifyListeners(discoveryResult, EventType.removed);
                 return true;
@@ -285,7 +290,9 @@ public final class PersistentInbox implements Inbox, DiscoveryListener, ThingReg
 
     @Override
     public void thingDiscovered(DiscoveryService source, DiscoveryResult result) {
-        add(result);
+        if (add(result)) {
+            resultDiscovererMap.put(result, source.getClass());
+        }
     }
 
     @Override
@@ -298,8 +305,9 @@ public final class PersistentInbox implements Inbox, DiscoveryListener, ThingReg
             Collection<ThingTypeUID> thingTypeUIDs) {
         HashSet<ThingUID> removedThings = new HashSet<>();
         for (DiscoveryResult discoveryResult : getAll()) {
-            if (thingTypeUIDs.contains(discoveryResult.getThingTypeUID())
-                    && discoveryResult.getTimestamp() < timestamp) {
+            Class<?> discoverer = resultDiscovererMap.get(discoveryResult);
+            if (thingTypeUIDs.contains(discoveryResult.getThingTypeUID()) && discoveryResult.getTimestamp() < timestamp
+                    && (discoverer == null || source.getClass() == discoverer)) {
                 ThingUID thingUID = discoveryResult.getThingUID();
                 removedThings.add(thingUID);
                 remove(thingUID);
@@ -319,7 +327,9 @@ public final class PersistentInbox implements Inbox, DiscoveryListener, ThingReg
 
     @Override
     public void removed(Thing thing) {
-        // nothing to do
+        if (thing instanceof Bridge) {
+            removeResultsForBridge(thing.getUID());
+        }
     }
 
     @Override

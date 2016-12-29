@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,7 +13,7 @@ import org.eclipse.smarthome.core.types.State;
 /**
  * {@link ItemStateEvent}s can be used to deliver item status updates through the Eclipse SmartHome event bus.
  * State events must be created with the {@link ItemEventFactory}.
- * 
+ *
  * @author Stefan Bußweiler - Initial contribution
  */
 public class ItemStateEvent extends AbstractEvent {
@@ -29,7 +29,7 @@ public class ItemStateEvent extends AbstractEvent {
 
     /**
      * Constructs a new item state event.
-     * 
+     *
      * @param topic the topic
      * @param payload the payload
      * @param itemName the item name
@@ -49,7 +49,7 @@ public class ItemStateEvent extends AbstractEvent {
 
     /**
      * Gets the item name.
-     * 
+     *
      * @return the item name
      */
     public String getItemName() {
@@ -58,7 +58,7 @@ public class ItemStateEvent extends AbstractEvent {
 
     /**
      * Gets the item state.
-     * 
+     *
      * @return the item state
      */
     public State getItemState() {
@@ -67,7 +67,7 @@ public class ItemStateEvent extends AbstractEvent {
 
     @Override
     public String toString() {
-        return itemName + " updated to " + itemState.toString();
+        return String.format("%s updated to %s", itemName, itemState);
     }
 
 }

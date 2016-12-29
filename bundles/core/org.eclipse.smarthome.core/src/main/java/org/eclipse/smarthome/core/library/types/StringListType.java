@@ -1,18 +1,19 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-
 package org.eclipse.smarthome.core.library.types;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Formatter;
 import java.util.List;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.State;
 
@@ -31,6 +32,10 @@ public class StringListType implements Command, State {
     static final public String DELIMITER = ",";
     static final public String ESCAPED_DELIMITER = "\\" + DELIMITER;
     static final public String REGEX_SPLITTER = "(?<!\\\\)" + DELIMITER;
+
+    public StringListType() {
+        typeDetails = Collections.emptyList();
+    }
 
     public StringListType(StringType... rows) {
         typeDetails = new ArrayList<String>(rows.length);
@@ -80,13 +85,20 @@ public class StringListType implements Command, State {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
+        return toFullString();
+    }
+
+    @Override
+    public String toFullString() {
+        List<String> parts = new ArrayList<>(typeDetails.size());
         for (String row : typeDetails) {
-            sb.append(row.replace(DELIMITER, ESCAPED_DELIMITER));
-            sb.append(DELIMITER);
+            parts.add(row.replace(DELIMITER, ESCAPED_DELIMITER));
         }
-        sb.delete(sb.length() - 1, sb.length());
-        return sb.toString();
+        return StringUtils.join(parts, DELIMITER);
+    }
+
+    public static StringListType valueOf(String value) {
+        return new StringListType(value);
     }
 
 }

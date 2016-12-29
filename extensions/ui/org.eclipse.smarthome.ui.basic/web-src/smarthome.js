@@ -206,6 +206,10 @@
 		}
 
 		function destroy() {
+			if (_t.onHide !== undefined) {
+				_t.onHide();
+			}
+
 			document.removeEventListener("keydown", onkeydown);
 		}
 
@@ -261,6 +265,42 @@
 		};
 	}
 
+	function VisibilityChangeProxy(delay, maxEvents) {
+		var
+			_t = this;
+
+		function processEvent(event) {
+			event.widget.setVisible(event.visibility);
+		}
+
+		_t.queue = [];
+		_t.timeout = null;
+
+		_t.processEvents = function() {
+			_t.timeout = null;
+
+			while (_t.queue.length !== 0) {
+				processEvent(_t.queue[0]);
+				_t.queue = _t.queue.slice(1);
+			}
+		};
+
+		_t.push = function(event) {
+			if (_t.queue.length > maxEvents) {
+				return;
+			}
+
+			_t.queue.push(event);
+
+			if (_t.timeout === null) {
+				_t.timeout = setTimeout(_t.processEvents, delay);
+			} else {
+				clearTimeout(_t.timeout);
+				_t.timeout = setTimeout(_t.processEvents, delay);
+			}
+		};
+	}
+
 	/* class Control */
 	function Control(parentNode) {
 		var
@@ -268,16 +308,18 @@
 			suppress = false;
 
 		_t.parentNode = parentNode;
+		_t.formRow = parentNode.parentNode;
 		_t.item = _t.parentNode.getAttribute(o.itemAttribute);
 		_t.id = _t.parentNode.getAttribute(o.idAttribute);
 		_t.icon = _t.parentNode.parentNode.querySelector(o.formIcon);
+		_t.visible = !_t.formRow.classList.contains(o.formRowHidden);
 
 		if (_t.icon !== null) {
 			_t.iconName = _t.icon.getAttribute(o.iconAttribute);
 		}
 
 		_t.reloadIcon = function(state) {
-			// This condition should be always true, but who knows?
+			// Some widgets don't have icons
 			if (_t.icon !== null) {
 				_t.icon.setAttribute("src",
 					"/icon/" +
@@ -290,12 +332,22 @@
 			}
 		};
 
-		_t.setValue = function(value) {
-			_t.reloadIcon(value);
+		_t.setVisible = function(state) {
+			if (state) {
+				_t.formRow.classList.remove(o.formRowHidden);
+			} else {
+				_t.formRow.classList.add(o.formRowHidden);
+			}
+
+			_t.visible = state;
+		};
+
+		_t.setValue = function(value, itemState) {
+			_t.reloadIcon(itemState);
 			if (suppress) {
 				suppress = false;
 			} else {
-				_t.setValuePrivate(value);
+				_t.setValuePrivate(value, itemState);
 			}
 		};
 
@@ -307,18 +359,28 @@
 	}
 
 	/* class ControlImage */
-	function ControlImage(parentNode) {
+	function ControlImage(parentNode, callSuper) {
+		// Some controls combine Image functionality with
+		// other classes, so calling Control is conditional
+		if (callSuper) {
+			Control.call(this, parentNode);
+		}
+
 		var
 			_t = this;
 
 		_t.image = parentNode.querySelector("img");
 		_t.updateInterval = parseInt(parentNode.getAttribute("data-update-interval"), 10);
 
+		_t.url = _t.image.getAttribute("src").replace(/&t=\d+/g, "");
+
+		_t.setValuePrivate = function() {
+			_t.image.setAttribute("src", _t.url + "&t=" + Date.now());
+		};
+
 		if (_t.updateInterval === 0) {
 			return;
 		}
-
-		_t.url = _t.image.getAttribute("src").replace(/\d+$/, "");
 
 		var
 			interval = setInterval(function() {
@@ -326,7 +388,7 @@
 					clearInterval(interval);
 					return;
 				}
-				_t.image.setAttribute("src", _t.url + Math.random().toString().slice(2));
+				_t.image.setAttribute("src", _t.url + "&t=" + Date.now());
 			}, _t.updateInterval * 1000);
 	}
 
@@ -337,7 +399,7 @@
 		var
 			_t = this;
 
-		_t.setValue = function(value) {
+		_t.setValuePrivate = function(value) {
 			parentNode.innerHTML = value;
 		};
 	}
@@ -349,6 +411,7 @@
 		var
 			_t = this;
 
+		_t.value = _t.parentNode.querySelector(o.formValue);
 		_t.count = _t.parentNode.getAttribute("data-count") * 1;
 		_t.reset = function() {
 			_t.buttons.forEach(function(button) {
@@ -376,6 +439,10 @@
 		_t.valueMap = {};
 		_t.buttons = [].slice.call(_t.parentNode.querySelectorAll(o.controlButton));
 		_t.setValuePrivate = function(value) {
+			if (_t.value !== null) {
+				_t.value.innerHTML = value;
+			}
+
 			if (_t.count === 1) {
 				return;
 			}
@@ -596,8 +663,8 @@
 		_t.value = isNaN(parseFloat(_t.value)) ? 0 : parseFloat(_t.value);
 		_t.valueNode = _t.parentNode.parentNode.querySelector(o.formValue);
 
-		_t.setValuePrivate = function(value) {
-			_t.value = value * 1;
+		_t.setValuePrivate = function(value, itemState) {
+			_t.value = itemState * 1;
 			_t.valueNode.innerHTML = value;
 		};
 
@@ -705,6 +772,7 @@
 		_t.value = color;
 		_t.hsvValue = rgb2hsv(color);
 		_t.interval = null;
+		_t.isBeingChanged = false;
 
 		_t.colorpicker = _t.container.querySelector(o.colorpicker.colorpicker);
 		_t.image = _t.container.querySelector(o.colorpicker.image);
@@ -806,6 +874,8 @@
 				clearInterval(_t.interval);
 				_t.interval = null;
 			}
+
+			_t.isBeingChanged = false;
 			window.removeEventListener("mouseup", onWindowMouseup);
 		}
 
@@ -814,11 +884,11 @@
 				callback(_t.hsvValue);
 			}, 300);
 
-			smarthome.changeListener.pause();
 			window.addEventListener("mouseup", onWindowMouseup);
 
 			updateValue(event);
 			callback(_t.hsvValue);
+			_t.isBeingChanged = true;
 
 			event.stopPropagation();
 		}
@@ -842,8 +912,9 @@
 				clearInterval(_t.interval);
 				_t.interval = null;
 			}
-			smarthome.changeListener.resume();
+
 			window.removeEventListener("mouseup", onWindowMouseup);
+			_t.isBeingChanged = false;
 			event.stopPropagation();
 		}
 
@@ -851,13 +922,19 @@
 			callback(_t.hsvValue);
 		}, 200);
 
+		_t.updateColor = function(c) {
+			if (_t.isBeingChanged) {
+				return;
+			}
+
+			setColor(c);
+		};
+
 		// Some browsers fire onchange while the slider handle is being moved.
 		// This is incorrect, according to the specs, but it's impossible to detect,
 		// so DebounceProxy is used
 		function onSliderChange() {
 			_t.hsvValue.v = _t.slider.value / 100;
-			smarthome.changeListener.pause();
-
 			_t.debounceProxy.call();
 		}
 
@@ -866,7 +943,6 @@
 
 			_t.debounceProxy.call();
 			_t.debounceProxy.finish();
-			smarthome.changeListener.resume();
 		}
 
 		_t.slider.addEventListener("change", onSliderChange);
@@ -963,6 +1039,7 @@
 		}
 
 		_t.value = hex2rgb(_t.parentNode.getAttribute("data-value"));
+		_t.modalControl = null;
 		_t.buttonUp = _t.parentNode.querySelector(o.colorpicker.up);
 		_t.buttonDown = _t.parentNode.querySelector(o.colorpicker.down);
 		_t.buttonPick = _t.parentNode.querySelector(o.colorpicker.pick);
@@ -976,6 +1053,10 @@
 					v: t[2] / 100
 				};
 			_t.value = Colorpicker.hsv2rgb(hsv);
+
+			if (_t.modalControl !== null) {
+				_t.modalControl.updateColor(_t.value);
+			}
 		};
 
 		function emitEvent(value) {
@@ -1000,6 +1081,10 @@
 			_t.modal = new Modal(renderTemplate("template-colorpicker"));
 			_t.modal.show();
 			_t.modal.container.classList.add(o.colorpicker.modalClass);
+			_t.modal.onHide = function() {
+				_t.modalControl = null;
+				_t.modal = null;
+			};
 
 			_t.modalControl = new Colorpicker(_t.modal.container, _t.value, function(color) {
 				_t.value = Colorpicker.hsv2rgb(color);
@@ -1109,12 +1194,12 @@
 			_t.debounceProxy.call();
 		});
 
-		_t.setValuePrivate = function(value) {
+		_t.setValuePrivate = function(value, itemState) {
 			if (_t.locked) {
-				_t.reloadIcon(value);
+				_t.reloadIcon(itemState);
 				return;
 			}
-			_t.input.value = value;
+			_t.input.value = itemState;
 			_t.input.MaterialSlider.change();
 		};
 
@@ -1178,7 +1263,7 @@
 		});
 	}
 
-		function UI(root) {
+	function UI(root) {
 		/* const */
 		var
 			NavigationState = {
@@ -1200,7 +1285,7 @@
 		_t.iconType = document.body.getAttribute(o.iconTypeAttribute);
 
 		function setTitle(title) {
-			document.title = title;
+			document.querySelector("title").innerHTML = title;
 			_t.layoutTitle.innerHTML = title;
 		}
 
@@ -1308,10 +1393,14 @@
 			_t.newPage = page;
 
 			_t.showLoadingBar();
-			_t.destination = "/basicui/app?w=" + page + "&sitemap=" + smarthome.UI.sitemap;
+			_t.destination =
+				"/basicui/app?w=" + page +
+				"&sitemap=" + smarthome.UI.sitemap;
 
 			ajax({
-				url: _t.destination + "&__async=true",
+				url: _t.destination +
+					"&subscriptionId=" + smarthome.subscriptionId +
+					"&__async=true",
 				callback: _t.navigateCallback
 			});
 
@@ -1322,16 +1411,20 @@
 
 		_t.initControls = function() {
 			smarthome.dataModel = {};
+			smarthome.dataModelLegacy = {};
 
 			function appendControl(control) {
+				// dataModelLegacy keeps item → widgets binding for
+				// long-polling event listener
 				if (
-					(smarthome.dataModel[control.item] === undefined) ||
-					(smarthome.dataModel[control.item].widgets === undefined)
+					(smarthome.dataModelLegacy[control.item] === undefined) ||
+					(smarthome.dataModelLegacy[control.item].widgets === undefined)
 				) {
-					smarthome.dataModel[control.item] = { widgets: [] };
+					smarthome.dataModelLegacy[control.item] = { widgets: [] };
 				}
 
-				smarthome.dataModel[control.item].widgets.push(control);
+				smarthome.dataModelLegacy[control.item].widgets.push(control);
+				smarthome.dataModel[control.id] = control;
 			}
 
 			[].forEach.call(document.querySelectorAll(o.formControls), function(e) {
@@ -1357,10 +1450,10 @@
 					break;
 				case "chart":
 				case "image":
-					new ControlImage(e);
+					appendControl(new ControlImage(e, true));
 					break;
 				case "image-link":
-					new ControlImage(e);
+					appendControl(new ControlImage(e, false));
 				case "text-link":
 				case "group":
 					appendControl(new ControlLink(e));
@@ -1370,6 +1463,11 @@
 					break;
 				case "colorpicker":
 					appendControl(new ControlColorpicker(e));
+					break;
+				case "video":
+				case "webview":
+				case "mapview":
+					appendControl(new Control(e));
 					break;
 				default:
 					break;
@@ -1410,35 +1508,56 @@
 		};
 	}
 
-	function ChangeListenerEventsource() {
+	function ChangeListenerEventsource(subscribeLocation) {
 		AbstractChangeListener.call(this);
 
 		var
 			_t = this;
 
 		_t.navigate = function(){};
-		_t.source = new EventSource("/rest/events?topics=smarthome/items/*/state");
-		_t.source.addEventListener("message", function(payload) {
+		_t.source = new EventSource(subscribeLocation);
+		_t.source.addEventListener("event", function(payload) {
 			if (_t.paused) {
 				return;
 			}
 
 			var
 				data = JSON.parse(payload.data),
-				dataPayload = JSON.parse(data.payload),
-				value = dataPayload.value,
-				item = (function(topic) {
-					topic = topic.split("/");
-					return topic[topic.length - 2];
-				})(data.topic);
+				value;
 
-			if (!(item in smarthome.dataModel)) {
+			if (!(data.widgetId in smarthome.dataModel)) {
 				return;
 			}
 
-			smarthome.dataModel[item].widgets.forEach(function(widget) {
-				widget.setValue(value);
-			});
+			if (
+				(typeof(data.label) === "string") &&
+				(data.label.indexOf("[") !== -1) &&
+				(data.label.indexOf("]") !== -1)
+			) {
+				var
+					pos = data.label.indexOf("[");
+
+				value = data.label.substr(
+					pos + 1,
+					data.label.lastIndexOf("]") - (pos + 1)
+				);
+			} else {
+				value = data.item.state;
+			}
+
+			if (smarthome.dataModel[data.widgetId] !== undefined) {
+				var
+					widget = smarthome.dataModel[data.widgetId];
+
+				if (widget.visible !== data.visibility) {
+					smarthome.UI.layoutChangeProxy.push({
+						widget: widget,
+						visibility: data.visibility
+					});
+				} else {
+					widget.setValue(value, data.item.state);
+				}
+			}
 		});
 	}
 
@@ -1468,9 +1587,9 @@
 						item = widget.item.name,
 						value = widget.item.state;
 
-					smarthome.dataModel[item].widgets.forEach(function(w) {
+					smarthome.dataModelLegacy[item].widgets.forEach(function(w) {
 						if (value !== "NULL") {
-							w.setValue(value);
+							w.setValue(value, value);
 						}
 					});
 				});
@@ -1529,21 +1648,67 @@
 	}
 
 	function ChangeListener() {
-		if (featureSupport.eventSource) {
-			ChangeListenerEventsource.call(this);
-		} else {
-			ChangeListenerLongpolling.call(this);
-		}
+		var
+			_t = this;
+
+		_t.startSubscriber = function(response) {
+			var
+				responseJSON,
+				subscribeLocation,
+				subscribeLocationArray,
+				sitemap,
+				subscriptionId,
+				page;
+
+			try {
+				responseJSON = JSON.parse(response.responseText);
+			} catch (e) {
+				return;
+			}
+
+			if (responseJSON.status !== "CREATED") {
+				return;
+			}
+
+			try {
+				subscribeLocation = responseJSON.context.headers.Location[0];
+			} catch (e) {
+				return;
+			}
+
+			subscribeLocationArray = subscribeLocation.split("/");
+			subscriptionId = subscribeLocationArray[subscribeLocationArray.length - 1];
+
+			sitemap = document.body.getAttribute("data-sitemap");
+			page = document.body.getAttribute("data-page-id");
+
+			smarthome.subscriptionId = subscriptionId;
+
+			if (featureSupport.eventSource) {
+				ChangeListenerEventsource.call(_t, subscribeLocation +
+					"?sitemap=" + sitemap +
+					"&pageid=" + page);
+			} else {
+				ChangeListenerLongpolling.call(_t);
+			}
+		};
+
+		ajax({
+			url: "/rest/sitemaps/events/subscribe",
+			type: "POST",
+			callback: _t.startSubscriber
+		});
 	}
 
 	document.addEventListener("DOMContentLoaded", function() {
 		smarthome.UI = new UI(document);
+		smarthome.UI.layoutChangeProxy = new VisibilityChangeProxy(100, 50);
 		smarthome.UI.initControls();
 		smarthome.changeListener = new ChangeListener();
 	});
 })({
 	itemAttribute: "data-item",
-	idAttribute: "data-id",
+	idAttribute: "data-widget-id",
 	iconAttribute: "data-icon",
 	iconTypeAttribute: "data-icon-type",
 	controlButton: "button",
@@ -1552,6 +1717,7 @@
 	modalContainer: ".mdl-modal__content",
 	selectionRows: ".mdl-form__selection-rows",
 	formControls: ".mdl-form__control",
+	formRowHidden: "mdl-form__row--hidden",
 	formValue: ".mdl-form__value",
 	formRadio: ".mdl-radio",
 	formRadioControl: ".mdl-radio__button",

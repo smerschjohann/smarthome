@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,9 +7,7 @@
  */
 package org.eclipse.smarthome.config.dispatch.internal;
 
-import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
+import static java.nio.file.StandardWatchEventKinds.*;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -18,7 +16,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchEvent.Kind;
+import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.List;
@@ -67,6 +68,7 @@ import org.slf4j.LoggerFactory;
  * "pid: com.acme.smarthome.security".
  *
  * @author Kai Kreuzer - Initial contribution and API
+ * @author Petar Valchev - Added sort by modification time, when configuration files are read
  */
 public class ConfigDispatcher extends AbstractWatchService {
 
@@ -120,7 +122,7 @@ public class ConfigDispatcher extends AbstractWatchService {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * org.eclipse.smarthome.core.service.AbstractWatchService#getSourcePath()
      */
@@ -136,7 +138,7 @@ public class ConfigDispatcher extends AbstractWatchService {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * org.eclipse.smarthome.core.service.AbstractWatchService#watchSubDirectories
      * ()
@@ -148,26 +150,27 @@ public class ConfigDispatcher extends AbstractWatchService {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
-     * org.eclipse.smarthome.core.service.AbstractWatchService#registerDirecotry
+     * org.eclipse.smarthome.core.service.AbstractWatchService#registerDirectory
      * (java.nio.file.Path)
      */
     @Override
-    protected void registerDirectory(Path subDir) throws IOException {
-        subDir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
+    protected WatchKey registerDirectory(Path subDir) throws IOException {
+        return subDir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
     }
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see
      * org.eclipse.smarthome.core.service.AbstractWatchService#buildWatchQueueReader
      * (java.nio.file.WatchService, java.nio.file.Path)
      */
     @Override
-    protected AbstractWatchQueueReader buildWatchQueueReader(WatchService watchService, Path toWatch) {
-        return new WatchQueueReader(watchService, toWatch);
+    protected AbstractWatchQueueReader buildWatchQueueReader(WatchService watchService, Path toWatch,
+            Map<WatchKey, Path> registredWatchKeys) {
+        return new WatchQueueReader(watchService, toWatch, registredWatchKeys);
     }
 
     private String getDefaultServiceConfigFile() {
@@ -192,6 +195,14 @@ public class ConfigDispatcher extends AbstractWatchService {
         File dir = new File(getSourcePath());
         if (dir.exists()) {
             File[] files = dir.listFiles();
+            // Sort the files by modification time,
+            // so that the last modified file is processed last.
+            Arrays.sort(files, new Comparator<File>() {
+                @Override
+                public int compare(File left, File right) {
+                    return Long.valueOf(left.lastModified()).compareTo(right.lastModified());
+                }
+            });
             for (File file : files) {
                 try {
                     processConfigFile(file);
@@ -305,15 +316,15 @@ public class ConfigDispatcher extends AbstractWatchService {
 
     private class WatchQueueReader extends AbstractWatchQueueReader {
 
-        public WatchQueueReader(WatchService watchService, Path dir) {
-            super(watchService, dir);
+        public WatchQueueReader(WatchService watchService, Path dir, Map<WatchKey, Path> registeredKeys) {
+            super(watchService, dir, registeredKeys);
         }
 
         @Override
         protected void processWatchEvent(WatchEvent<?> event, Kind<?> kind, Path path) {
             if (kind == ENTRY_CREATE || kind == ENTRY_MODIFY) {
                 try {
-                    processConfigFile(new File(dir.toAbsolutePath() + File.separator + path.toString()));
+                    processConfigFile(new File(baseWatchedDir.toAbsolutePath() + File.separator + path.toString()));
                 } catch (IOException e) {
                     logger.warn("Could not process config file '{}': {}", path, e);
                 }

@@ -1,7 +1,5 @@
-
-
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -28,6 +26,7 @@ import org.eclipse.smarthome.core.events.Event
 import org.eclipse.smarthome.core.events.EventFilter
 import org.eclipse.smarthome.core.events.EventSubscriber
 import org.eclipse.smarthome.core.i18n.I18nProvider
+import org.eclipse.smarthome.core.thing.Bridge
 import org.eclipse.smarthome.core.thing.Channel
 import org.eclipse.smarthome.core.thing.ChannelUID
 import org.eclipse.smarthome.core.thing.ManagedThingProvider
@@ -87,6 +86,7 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
     }
 
     class SimpleThingHandlerFactory extends BaseThingHandlerFactory {
+        def handlers = new HashSet<ThingHandler>()
 
         @Override
         public boolean supportsThingType(ThingTypeUID thingTypeUID) {
@@ -95,7 +95,13 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
 
         @Override
         protected ThingHandler createHandler(Thing thing) {
-            return new SimpleThingHandler(thing)
+            def handler = (thing instanceof Bridge) ? new SimpleBridgeHandler(thing) : new SimpleThingHandler(thing)
+            handlers.add(handler)
+            handler
+        }
+
+        public Set<ThingHandler> getHandlers() {
+            handlers
         }
     }
 
@@ -109,6 +115,21 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
         public void handleCommand(ChannelUID channelUID, Command command) {
             // check getBridge works
             assertThat getBridge().getUID().toString(), is("bindingId:type1:bridgeId")
+        }
+    }
+
+    class SimpleBridgeHandler extends BaseBridgeHandler {
+
+        SimpleBridgeHandler(Thing thing) {
+            super(thing)
+        }
+
+        @Override
+        public void handleCommand(ChannelUID channelUID, Command command) {
+        }
+
+        public void updateBridgetatus(ThingStatus status) {
+            updateStatus(status)
         }
     }
 
@@ -127,18 +148,20 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
         managedThingProvider.add(bridge)
         managedThingProvider.add(thing)
 
-        def handler = thing.getHandler()
-        assertThat handler, is(not(null))
+        def handler = null
+        waitForAssert {
+            handler = thing.getHandler()
+            assertThat handler, is(not(null))
+        }
 
-        // check that the handler is registered as OSGi service
-        def handlerOsgiService = getService(ThingHandler, {
-            it.getProperty(ThingHandler.SERVICE_PROPERTY_THING_ID).toString() == "bindingId:type2:thingId"
-        })
-        assertThat handlerOsgiService, is(handler)
+        def retrievedHandler = getThingHandler(thingHandlerFactory, SimpleThingHandler)
+        assertThat retrievedHandler, is(handler)
 
         // check that base thing handler does not implement config status provider
-        def configStatusProviderOsgiService = getService(ConfigStatusProvider)
-        assertThat configStatusProviderOsgiService, is(null)
+        waitForAssert {
+            def configStatusProviderOsgiService = getService(ConfigStatusProvider)
+            assertThat configStatusProviderOsgiService, is(null)
+        }
 
         // the assertion is in handle command
         handler.handleCommand(null, null)
@@ -150,7 +173,7 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
     @Test
     void 'assert BaseThingHandlerFactory registers config status provider'() {
 
-        def componentContext = [getBundleContext: {bundleContext}] as ComponentContext
+        def componentContext = [getBundleContext: { bundleContext }] as ComponentContext
         def thingHandlerFactory = new ConfigStatusProviderThingHandlerFactory()
         thingHandlerFactory.activate(componentContext)
         registerService(thingHandlerFactory, ThingHandlerFactory.class.name)
@@ -172,7 +195,7 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
 
     @Test
     void 'assert config status is propagated'() {
-        def componentContext = [getBundleContext: {bundleContext}] as ComponentContext
+        def componentContext = [getBundleContext: { bundleContext }] as ComponentContext
         def thingHandlerFactory = new ConfigStatusProviderThingHandlerFactory()
         thingHandlerFactory.activate(componentContext)
         registerService(thingHandlerFactory, ThingHandlerFactory.class.name)
@@ -186,7 +209,7 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
         ConfigStatusService service = getService(ConfigStatusService)
         service.setI18nProvider([
             getText: { bundle, key, defaultText, locale, args ->
-                key.equals("param.invalid") ? "param invalid" : "param ok"
+                key.endsWith("param.invalid") ? "param invalid" : "param ok"
             }
         ]  as I18nProvider)
 
@@ -278,8 +301,8 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
     class ConfigStatusProviderThingHandler extends ConfigStatusThingHandler {
 
         private static final String PARAM = "param"
-        private static final ConfigStatusMessage ERROR = ConfigStatusMessage.Builder.error(PARAM).withMessageKey("param.invalid").build()
-        private static final ConfigStatusMessage INFO = ConfigStatusMessage.Builder.information(PARAM).withMessageKey("param.ok").build()
+        private static final ConfigStatusMessage ERROR = ConfigStatusMessage.Builder.error(PARAM).withMessageKeySuffix("param.invalid").build()
+        private static final ConfigStatusMessage INFO = ConfigStatusMessage.Builder.information(PARAM).withMessageKeySuffix("param.ok").build()
         private ConfigStatusCallback configStatusCallback;
 
         ConfigStatusProviderThingHandler(Thing thing) {
@@ -508,6 +531,62 @@ class BindingBaseClassesOSGiTest extends OSGiTest {
 
         // now check if the thing's configuration has been rolled back
         assertThat thing.getConfiguration().get("parameter"), is("before")
+    }
+
+    @Test
+    void 'assert BaseThingHandler handles bridge status updates correctly'() {
+        def componentContext = [getBundleContext: { bundleContext }] as ComponentContext
+        def thingHandlerFactory = new SimpleThingHandlerFactory()
+        thingHandlerFactory.activate(componentContext)
+        registerService(thingHandlerFactory, ThingHandlerFactory.class.name)
+
+        def bridge = BridgeBuilder.create(new ThingUID("bindingId:type1:bridgeId")).build()
+        def thingA = ThingBuilder.create(new ThingUID("bindingId:type2:thingIdA")).withBridge(bridge.getUID()).build()
+        def thingB = ThingBuilder.create(new ThingUID("bindingId:type2:thingIdB")).withBridge(bridge.getUID()).build()
+
+        assertThat bridge.getStatus(), is(ThingStatus.UNINITIALIZED)
+        assertThat thingA.getStatus(), is(ThingStatus.UNINITIALIZED)
+        assertThat thingB.getStatus(), is(ThingStatus.UNINITIALIZED)
+
+        managedThingProvider.add(bridge)
+        managedThingProvider.add(thingA)
+        managedThingProvider.add(thingB)
+
+        waitForAssert({assertThat bridge.getStatus(), is(ThingStatus.ONLINE)})
+        waitForAssert({assertThat thingA.getStatus(), is(ThingStatus.ONLINE)})
+        waitForAssert({assertThat thingB.getStatus(), is(ThingStatus.ONLINE)})
+
+        // set bridge status to OFFLINE
+        def bridgeHandler = getThingHandler(thingHandlerFactory, SimpleBridgeHandler)
+        assertThat bridgeHandler, not(null)
+        bridgeHandler.updateBridgetatus(ThingStatus.OFFLINE)
+
+        // child things are OFFLINE with detail BRIDGE_OFFLINE
+        waitForAssert({assertThat bridge.getStatus(), is(ThingStatus.OFFLINE)})
+        def thingStatusInfo = ThingStatusInfoBuilder.create(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE).build()
+        waitForAssert({assertThat thingA.getStatusInfo(), is(thingStatusInfo)})
+        waitForAssert({assertThat thingB.getStatusInfo(), is(thingStatusInfo)})
+
+        // set bridge status to ONLINE
+        bridgeHandler.updateBridgetatus(ThingStatus.ONLINE)
+
+        // child things are ONLINE with detail NONE
+        waitForAssert({assertThat bridge.getStatus(), is(ThingStatus.ONLINE)})
+        thingStatusInfo = ThingStatusInfoBuilder.create(ThingStatus.ONLINE, ThingStatusDetail.NONE).build()
+        waitForAssert({assertThat thingA.getStatusInfo(), is(thingStatusInfo)})
+        waitForAssert({assertThat thingB.getStatusInfo(), is(thingStatusInfo)})
+
+        unregisterService(ThingHandlerFactory.class.name)
+        thingHandlerFactory.deactivate(componentContext)
+    }
+
+    protected <T extends ThingHandler> T getThingHandler(SimpleThingHandlerFactory factory, Class<T> clazz){
+        for(ThingHandler handler : factory.getHandlers()) {
+            if(clazz.isInstance(handler)) {
+                return handler
+            }
+        }
+        return null
     }
 
     private void registerThingTypeAndConfigDescription() {

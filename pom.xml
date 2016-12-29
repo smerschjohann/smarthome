@@ -133,13 +133,6 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.eclipse.xtend</groupId>
-        <artifactId>xtend-maven-plugin</artifactId>
-        <configuration>
-          <javaSourceVersion>1.7</javaSourceVersion>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
       </plugin>
@@ -261,7 +254,7 @@
         <plugin>
           <groupId>com.mycila</groupId>
           <artifactId>license-maven-plugin</artifactId>
-          <version>2.10</version>
+          <version>3.0</version>
           <configuration>
             <basedir>${basedir}</basedir>
             <header>src/etc/header.txt</header>
@@ -269,13 +262,21 @@
             <failIfMissing>true</failIfMissing>
             <strictCheck>true</strictCheck>
             <aggregate>true</aggregate>
+            <useDefaultMapping>true</useDefaultMapping>
+            <mapping>
+              <xtend>JAVADOC_STYLE</xtend>
+              <mwe2>JAVADOC_STYLE</mwe2>
+            </mapping>
             <includes>
               <include>**/org/eclipse/smarthome/**/*.java</include>
               <include>**/org/eclipse/smarthome/**/*.groovy</include>
+              <include>**/org/eclipse/smarthome/**/*.xtend</include>
+              <include>**/*.mwe2</include>
               <include>**/feature.xml</include>
               <include>**/OSGI-INF/*.xml</include>
             </includes>
             <excludes>
+              <exclude>**/org.eclipse.smarthome.automation.*/**</exclude>
               <exclude>**/org/eclipse/smarthome/protocols/**</exclude>
               <exclude>target/**</exclude>
               <exclude>**/pom.xml</exclude>
@@ -283,7 +284,7 @@
             </excludes>
             <useDefaultExcludes>true</useDefaultExcludes>
             <properties>
-              <year>2015</year>
+              <year>2016</year>
             </properties>
             <encoding>UTF-8</encoding>
           </configuration>
@@ -299,6 +300,9 @@
           <groupId>org.eclipse.xtend</groupId>
           <artifactId>xtend-maven-plugin</artifactId>
           <version>${xtext-version}</version>
+          <configuration>
+            <javaSourceVersion>1.7</javaSourceVersion>
+          </configuration>
           <executions>
             <execution>
               <goals>

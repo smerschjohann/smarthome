@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -67,14 +67,11 @@ public class ColorpickerRenderer extends AbstractWidgetRenderer {
         String purelabel = itemUIRegistry.getLabel(w);
         purelabel = purelabel.replaceAll("\\\"", "\\\\'");
 
-        snippet = StringUtils.replace(snippet, "%id%", itemUIRegistry.getWidgetId(cp));
-        snippet = StringUtils.replace(snippet, "%category%", getCategory(w));
-        snippet = StringUtils.replace(snippet, "%icon_type%", config.getIconType());
-        snippet = StringUtils.replace(snippet, "%state%", getState(w));
-        snippet = StringUtils.replace(snippet, "%item%", w.getItem());
-        snippet = StringUtils.replace(snippet, "%label%", label);
-        snippet = StringUtils.replace(snippet, "%purelabel%", purelabel);
+        // Should be called before preprocessSnippet
         snippet = StringUtils.replace(snippet, "%state%", hexValue);
+
+        snippet = preprocessSnippet(snippet, w);
+        snippet = StringUtils.replace(snippet, "%purelabel%", purelabel);
         snippet = StringUtils.replace(snippet, "%frequency%", frequency);
         snippet = StringUtils.replace(snippet, "%servletname%", WebAppServlet.SERVLET_NAME);
 

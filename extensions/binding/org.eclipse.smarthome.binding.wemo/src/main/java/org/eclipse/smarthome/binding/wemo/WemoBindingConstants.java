@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -35,6 +35,7 @@ public class WemoBindingConstants {
     // List of all Channel ids
     public final static String CHANNEL_STATE = "state";
     public final static String CHANNEL_MOTIONDETECTION = "motionDetection";
+    public final static String CHANNEL_LASTMOTIONDETECTED = "lastMotionDetected";
     public final static String CHANNEL_LASTCHANGEDAT = "lastChangedAt";
     public final static String CHANNEL_LASTONFOR = "lastOnFor";
     public final static String CHANNEL_ONTODAY = "onToday";

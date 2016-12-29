@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,20 +10,14 @@ package org.eclipse.smarthome.config.setup.test.inbox
 import static org.hamcrest.CoreMatchers.*
 import static org.junit.Assert.*
 
-import java.net.URI;
-import java.util.List
-import java.util.Map;
-
-import javax.xml.ws.Response
-import org.eclipse.smarthome.core.thing.binding.BaseThingHandlerFactory
-import org.eclipse.smarthome.core.thing.binding.ThingFactory;
-import org.eclipse.smarthome.core.thing.binding.ThingHandler;
-import org.eclipse.smarthome.core.thing.binding.builder.BridgeBuilder
 import org.eclipse.smarthome.config.core.ConfigDescription
-import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
+import org.eclipse.smarthome.config.core.ConfigDescriptionParameter
 import org.eclipse.smarthome.config.core.ConfigDescriptionRegistry
-import org.eclipse.smarthome.config.core.Configuration;
+import org.eclipse.smarthome.config.core.Configuration
+import org.eclipse.smarthome.config.core.ConfigDescriptionParameter.Type
+import org.eclipse.smarthome.config.discovery.AbstractDiscoveryService
 import org.eclipse.smarthome.config.discovery.DiscoveryResult
+import org.eclipse.smarthome.config.discovery.DiscoveryResultBuilder
 import org.eclipse.smarthome.config.discovery.DiscoveryResultFlag
 import org.eclipse.smarthome.config.discovery.DiscoveryServiceRegistry
 import org.eclipse.smarthome.config.discovery.inbox.Inbox
@@ -33,15 +27,16 @@ import org.eclipse.smarthome.config.discovery.inbox.events.InboxAddedEvent
 import org.eclipse.smarthome.config.discovery.inbox.events.InboxRemovedEvent
 import org.eclipse.smarthome.config.discovery.inbox.events.InboxUpdatedEvent
 import org.eclipse.smarthome.config.discovery.internal.DiscoveryResultImpl
-import org.eclipse.smarthome.config.core.ConfigDescriptionParameter.Type
-import org.eclipse.smarthome.config.discovery.internal.PersistentInbox;
-import org.eclipse.smarthome.config.discovery.DiscoveryResultBuilder
+import org.eclipse.smarthome.config.discovery.internal.PersistentInbox
 import org.eclipse.smarthome.core.events.EventSubscriber
 import org.eclipse.smarthome.core.thing.ManagedThingProvider
 import org.eclipse.smarthome.core.thing.Thing
 import org.eclipse.smarthome.core.thing.ThingRegistry
 import org.eclipse.smarthome.core.thing.ThingTypeUID
 import org.eclipse.smarthome.core.thing.ThingUID
+import org.eclipse.smarthome.core.thing.binding.BaseThingHandlerFactory
+import org.eclipse.smarthome.core.thing.binding.ThingHandler
+import org.eclipse.smarthome.core.thing.binding.builder.BridgeBuilder
 import org.eclipse.smarthome.core.thing.binding.builder.ThingBuilder
 import org.eclipse.smarthome.core.thing.type.ThingType
 import org.eclipse.smarthome.core.thing.type.ThingTypeRegistry
@@ -50,20 +45,42 @@ import org.eclipse.smarthome.test.OSGiTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.ComponentContext
 
 import com.google.common.collect.Sets
 
-
 class InboxOSGITest extends OSGiTest {
+
+    class DiscoveryService1 extends AbstractDiscoveryService {
+        public DiscoveryService1() {
+            super(5)
+        }
+
+        @Override
+        protected void startScan() {
+        }
+    }
+    class DiscoveryService2 extends AbstractDiscoveryService {
+        public DiscoveryService2() {
+            super(5)
+        }
+
+        @Override
+        protected void startScan() {
+        }
+    }
+
+    def discoveryService1 = [] as DiscoveryService1
+    def discoveryService2 = [] as DiscoveryService2
 
     def DEFAULT_TTL = 60
     def BRIDGE_ID = new ThingUID("bindingId:bridge:bridgeId")
-    def BRIDGE = new DiscoveryResultImpl(BRIDGE_ID, null, null,"Bridge", "bridge", DEFAULT_TTL)
-    def THING1_WITH_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id1"), BRIDGE_ID, null,"Thing1", "thing1", DEFAULT_TTL)
-    def THING2_WITH_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id2"), BRIDGE_ID, null,"Thing2", "thing2", DEFAULT_TTL)
-    def THING_WITHOUT_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id3"), null, null,"Thing3", "thing3", DEFAULT_TTL)
-    def THING_WITH_OTHER_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id4"), new ThingUID("bindingId:thing:id5"),null,"Thing4", "thing4", DEFAULT_TTL)
+
+    DiscoveryResult BRIDGE = new DiscoveryResultImpl(BRIDGE_ID, null, null,"Bridge", "bridge", DEFAULT_TTL)
+    DiscoveryResult THING1_WITH_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id1"), BRIDGE_ID, null,"Thing1", "thing1", DEFAULT_TTL)
+    DiscoveryResult THING2_WITH_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id2"), BRIDGE_ID, null,"Thing2", "thing2", DEFAULT_TTL)
+    DiscoveryResult THING_WITHOUT_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id3"), null, null,"Thing3", "thing3", DEFAULT_TTL)
+    DiscoveryResult THING_WITH_OTHER_BRIDGE = new DiscoveryResultImpl(new ThingUID("bindingId:thing:id4"), new ThingUID("bindingId:thing:id5"),null,"Thing4", "thing4", DEFAULT_TTL)
 
     final List<DiscoveryResult> inboxContent = []
     final URI testURI = new URI("http:dummy")
@@ -109,7 +126,7 @@ class InboxOSGITest extends OSGiTest {
         typeRegistry = getService ThingTypeRegistry
         descriptionRegistry = getService ConfigDescriptionRegistry
         def componentContextMock = [
-            getBundleContext: {getBundleContext()}
+            getBundleContext: { getBundleContext() }
         ] as ComponentContext
         ((PersistentInbox)inbox).addThingHandlerFactory(new DummyThingHandlerFactory(componentContextMock))
     }
@@ -691,6 +708,34 @@ class InboxOSGITest extends OSGiTest {
         }
     }
 
+    @Test
+    void 'assert that removing a bridge Thing from the registry removes its discovered child Things from the inbox'() {
+        def receivedEvents = new ArrayList()
+        def inboxEventSubscriber = [
+            receive: { event -> receivedEvents.add(event) },
+            getSubscribedEventTypes: { Sets.newHashSet(InboxAddedEvent.TYPE, InboxRemovedEvent.TYPE, InboxUpdatedEvent.TYPE) },
+            getEventFilter: { null },
+        ] as EventSubscriber
+        registerService inboxEventSubscriber
+
+        registry.add(BridgeBuilder.create(BRIDGE.thingUID).build())
+
+        inbox.add(THING1_WITH_BRIDGE)
+        inbox.add(THING2_WITH_BRIDGE)
+        inbox.add(THING_WITHOUT_BRIDGE)
+        inbox.add(THING_WITH_OTHER_BRIDGE)
+        assertThat inbox.get(new InboxFilterCriteria(DiscoveryResultFlag.NEW)), hasItems(THING1_WITH_BRIDGE,THING2_WITH_BRIDGE,THING_WITHOUT_BRIDGE, THING_WITH_OTHER_BRIDGE)
+
+
+        registry.forceRemove(BRIDGE.thingUID)
+
+        waitForAssert({
+            assertTrue inbox.get(new InboxFilterCriteria(THING1_WITH_BRIDGE.thingUID, DiscoveryResultFlag.NEW)).isEmpty()
+            assertTrue inbox.get(new InboxFilterCriteria(THING2_WITH_BRIDGE.thingUID, DiscoveryResultFlag.NEW)).isEmpty()
+            assertThat inbox.get(new InboxFilterCriteria(DiscoveryResultFlag.NEW)), hasItems(THING_WITHOUT_BRIDGE,THING_WITH_OTHER_BRIDGE)
+        })
+    }
+
     @Test(expected=IllegalArgumentException.class)
     void 'assert that approve throw IllegalArgumentException if thingUID is null'(){
         inbox.approve(null, "label")
@@ -774,6 +819,32 @@ class InboxOSGITest extends OSGiTest {
             assertFalse descResultParam == null
             assertTrue thingProperty.equals(descResultParam)
         }
+    }
+
+    @Test
+    void 'assert that removeOlderResults only removes results from the same discovery service'() {
+        inbox.thingDiscovered discoveryService1, testDiscoveryResult
+        long now = new Date().getTime() + 1
+        assertThat inbox.getAll().size(), is(1)
+
+        // should not remove a result
+        inbox.removeOlderResults(discoveryService2, now, [testThingType.getUID()])
+        assertThat inbox.getAll().size(), is(1)
+
+        // should remove a result
+        inbox.removeOlderResults(discoveryService1, now, [testThingType.getUID()])
+        assertThat inbox.getAll().size(), is(0)
+    }
+
+    @Test
+    void 'assert that removeOlderResults removes results without a source'() {
+        inbox.add testDiscoveryResult
+        long now = new Date().getTime() + 1
+        assertThat inbox.getAll().size(), is(1)
+
+        // should remove a result
+        inbox.removeOlderResults(discoveryService2, now, [testThingType.getUID()])
+        assertThat inbox.getAll().size(), is(0)
     }
 
     class DummyThingHandlerFactory extends BaseThingHandlerFactory {

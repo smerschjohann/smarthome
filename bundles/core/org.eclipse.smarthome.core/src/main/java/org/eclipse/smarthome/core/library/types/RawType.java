@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -42,12 +42,17 @@ public class RawType implements PrimitiveType, State {
 
     @Override
     public String toString() {
+        return String.format("raw type: %d bytes", bytes.length);
+    }
+
+    @Override
+    public String toFullString() {
         return PortableBase64.getEncoder().encode(bytes);
     }
 
     @Override
     public String format(String pattern) {
-        return toString();
+        return toFullString();
     }
 
     @Override
@@ -60,15 +65,19 @@ public class RawType implements PrimitiveType, State {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+        if (getClass() != obj.getClass()) {
             return false;
+        }
         RawType other = (RawType) obj;
-        if (!Arrays.equals(bytes, other.bytes))
+        if (!Arrays.equals(bytes, other.bytes)) {
             return false;
+        }
         return true;
     }
 

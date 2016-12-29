@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,8 +11,6 @@ import static org.hamcrest.CoreMatchers.*
 import static org.junit.Assert.*
 import static org.junit.matchers.JUnitMatchers.*
 
-import java.util.Collection;
-
 import org.eclipse.smarthome.config.discovery.DiscoveryListener
 import org.eclipse.smarthome.config.discovery.DiscoveryResult
 import org.eclipse.smarthome.config.discovery.DiscoveryService
@@ -20,8 +18,10 @@ import org.eclipse.smarthome.config.discovery.DiscoveryServiceRegistry
 import org.eclipse.smarthome.config.discovery.ScanListener
 import org.eclipse.smarthome.config.discovery.inbox.Inbox
 import org.eclipse.smarthome.config.discovery.internal.DiscoveryServiceRegistryImpl
+import org.eclipse.smarthome.core.thing.ThingRegistry
 import org.eclipse.smarthome.core.thing.ThingTypeUID
 import org.eclipse.smarthome.core.thing.ThingUID
+import org.eclipse.smarthome.core.thing.binding.builder.ThingBuilder
 import org.eclipse.smarthome.test.AsyncResultWrapper
 import org.eclipse.smarthome.test.OSGiTest
 import org.junit.After
@@ -39,9 +39,10 @@ import org.osgi.framework.ServiceRegistration
  * This implementation creates two {@link DiscoveryService} mocks and registers
  * them as service at the <i>OSGi</i> service registry. Since this test creates
  * {@link DiscoveryResult}s which are added to the {@link Inbox},
- * the {@link Inbox} is cleared again after this test returns. 
- * 
+ * the {@link Inbox} is cleared again after this test returns.
+ *
  * @author Michael Grammling - Initial Contribution
+ * @author Simon Kaufmann - added tests for ExtendedDiscoveryService
  */
 class DiscoveryServiceRegistryOSGITest extends OSGiTest {
 
@@ -54,33 +55,56 @@ class DiscoveryServiceRegistryOSGITest extends OSGiTest {
     def FAULTY_BINDING_ID = 'faultyBindingId'
     def FAULTY_THING_TYPE = 'faultyThingType'
 
+    def EXTENDED_BINDING_ID = 'extendedBindingId'
+    def EXTENDED_THING_TYPE = 'extendedThingType'
+
+    class AnotherDiscoveryService extends DiscoveryServiceMock {
+        public AnotherDiscoveryService(Object thingType, int timeout) {
+            super(thingType, timeout);
+        }
+    }
+
     DiscoveryService discoveryServiceMockForBinding1
     DiscoveryService discoveryServiceMockForBinding2
     DiscoveryService discoveryServiceFaultyMock
+    ExtendedDiscoveryServiceMock extendedDiscoveryServiceMock
     DiscoveryServiceRegistry discoveryServiceRegistry
     List<ServiceRegistration<?>> serviceRegs = []
+    ThingRegistry thingRegistry
+    Inbox inbox
 
     @Before
     void setUp() {
         registerVolatileStorageService()
 
+        thingRegistry = getService(ThingRegistry)
+        assertNotNull thingRegistry
+
+        inbox = getService(Inbox)
+        assertNotNull(inbox)
+
         discoveryServiceMockForBinding1 = new DiscoveryServiceMock(
                 new ThingTypeUID(ANY_BINDING_ID_1,ANY_THING_TYPE_1), 1)
-        discoveryServiceMockForBinding2 = new DiscoveryServiceMock(
-                new ThingTypeUID(ANY_BINDING_ID_2,ANY_THING_TYPE_2), 1)
+        discoveryServiceMockForBinding2 = new ExtendedDiscoveryServiceMock(
+                new ThingTypeUID(ANY_BINDING_ID_2,ANY_THING_TYPE_2), 3)
 
         discoveryServiceFaultyMock = new DiscoveryServiceMock(
                 new ThingTypeUID(FAULTY_BINDING_ID, FAULTY_THING_TYPE), 1, true)
 
+        extendedDiscoveryServiceMock = new ExtendedDiscoveryServiceMock(
+                new ThingTypeUID(EXTENDED_BINDING_ID, EXTENDED_THING_TYPE), 1, true)
+
         serviceRegs.add(registerService(discoveryServiceMockForBinding1, DiscoveryService.class.name))
         serviceRegs.add(registerService(discoveryServiceMockForBinding2, DiscoveryService.class.name))
         serviceRegs.add(registerService(discoveryServiceFaultyMock, DiscoveryService.class.name))
+        serviceRegs.add(registerService(extendedDiscoveryServiceMock, DiscoveryService.class.name))
 
         discoveryServiceRegistry = getService(DiscoveryServiceRegistry)
     }
 
     @After
     void cleanUp() {
+        extendedDiscoveryServiceMock.abortScan()
         discoveryServiceFaultyMock.abortScan()
         discoveryServiceMockForBinding1.abortScan()
         discoveryServiceMockForBinding2.abortScan()
@@ -240,6 +264,62 @@ class DiscoveryServiceRegistryOSGITest extends OSGiTest {
     }
 
     @Test
+    void 'assert that removeOlderResults removes only the entries of the same discovery service' () {
+        AsyncResultWrapper<Boolean> scanListenerResult1 = new AsyncResultWrapper<Boolean>()
+        AsyncResultWrapper<DiscoveryResult> discoveryListenerResult = new AsyncResultWrapper<Boolean>()
+        DiscoveryListener discoveryListenerMock = [
+            thingDiscovered: { DiscoveryService source, DiscoveryResult result ->
+                discoveryListenerResult.set result
+            },
+            removeOlderThings: { DiscoveryService source, long timestamp, Collection<ThingTypeUID> thingTypeUIDs ->
+                []
+            }
+        ] as DiscoveryListener
+
+        discoveryServiceRegistry.addDiscoveryListener(discoveryListenerMock);
+        discoveryServiceRegistry.startScan(new ThingTypeUID(ANY_BINDING_ID_1, ANY_THING_TYPE_1), [
+            onFinished: {
+                scanListenerResult1.set(Void.TYPE)
+            },
+            onErrorOccurred: {
+            }
+        ] as ScanListener)
+
+        waitForAssert({ assertTrue scanListenerResult1.isSet }, 2000)
+        assertTrue discoveryListenerResult.isSet
+
+        Inbox inbox = getService(Inbox)
+        assertThat inbox.getAll().size(), is(1)
+
+        // register another discovery service for the same thing type
+        AnotherDiscoveryService anotherDiscoveryServiceMockForBinding1 = new AnotherDiscoveryService(
+                new ThingTypeUID(ANY_BINDING_ID_1,ANY_THING_TYPE_1), 1)
+        serviceRegs.add(registerService(anotherDiscoveryServiceMockForBinding1, DiscoveryService.class.name))
+
+        // start discovery again
+        discoveryServiceRegistry.startScan(new ThingTypeUID(ANY_BINDING_ID_1, ANY_THING_TYPE_1), [
+            onFinished: {scanListenerResult1.set(Void.TYPE)},
+            onErrorOccurred: {
+            }
+        ] as ScanListener)
+        waitForAssert({ assertTrue scanListenerResult1.isSet }, 2000)
+        assertTrue discoveryListenerResult.isSet
+
+        assertThat inbox.getAll().size(), is(3)
+
+        // should remove no entry, as there is no older entry discovery of this specific discovery service
+        anotherDiscoveryServiceMockForBinding1.removeOlderResults(anotherDiscoveryServiceMockForBinding1.getTimestampOfLastScan())
+        assertThat inbox.getAll().size(), is(3)
+
+        // should remove only one entry
+        discoveryServiceMockForBinding1.removeOlderResults(discoveryServiceMockForBinding1.getTimestampOfLastScan())
+        assertThat inbox.getAll().size(), is(2)
+
+        anotherDiscoveryServiceMockForBinding1.abortScan()
+    }
+
+
+    @Test
     void 'assert that a removed listener is not notified about DiscoveryResults anymore' () {
         AsyncResultWrapper<DiscoveryResult> discoveryResult = new AsyncResultWrapper<Boolean>()
         boolean discoveryFinished = false;
@@ -311,4 +391,54 @@ class DiscoveryServiceRegistryOSGITest extends OSGiTest {
         assertTrue discoveryServiceRegistry.supportsDiscovery(ANY_BINDING_ID_1)
         assertFalse discoveryServiceRegistry.supportsDiscovery('unknownBindingId')
     }
+
+    @Test
+    void 'assert getMaxScanTimeout works' () {
+        assertEquals 1, discoveryServiceRegistry.getMaxScanTimeout(new ThingTypeUID(ANY_BINDING_ID_1, ANY_THING_TYPE_1))
+        assertEquals 0, discoveryServiceRegistry.getMaxScanTimeout(new ThingTypeUID(ANY_BINDING_ID_1, 'unknownType'))
+
+        assertEquals 3, discoveryServiceRegistry.getMaxScanTimeout(ANY_BINDING_ID_2)
+        assertEquals 0, discoveryServiceRegistry.getMaxScanTimeout('unknownBindingId')
+    }
+
+    @Test
+    void 'assert an existing Thing can be accessed by ExtendedDiscoveryService implementations'() {
+        ThingUID thingUID = new ThingUID(EXTENDED_BINDING_ID, "foo")
+
+        // verify that the callback has been set
+        assertNotNull extendedDiscoveryServiceMock.discoveryServiceCallback
+
+        // verify that the thing cannot be found if it's not there
+        assertNull extendedDiscoveryServiceMock.discoveryServiceCallback.getExistingThing(thingUID)
+
+        thingRegistry.add(ThingBuilder.create(new ThingTypeUID(EXTENDED_BINDING_ID, EXTENDED_THING_TYPE), thingUID).build())
+
+        // verify that the existing Thing can be accessed
+        assertNotNull extendedDiscoveryServiceMock.discoveryServiceCallback.getExistingThing(thingUID)
+    }
+
+    @Test
+    void 'assert that existing DiscoveryResults can be accessed by ExtendedDiscoveryService implementations'() {
+        ThingUID thingUID = new ThingUID(EXTENDED_BINDING_ID, EXTENDED_THING_TYPE, "foo")
+
+        // verify that the callback has been set
+        assertNotNull extendedDiscoveryServiceMock.discoveryServiceCallback
+
+        // verify that the DiscoveryResult cannot be found if it's not there
+        assertNull extendedDiscoveryServiceMock.discoveryServiceCallback.getExistingDiscoveryResult(thingUID)
+
+        boolean discoveryFinished = false;
+        discoveryServiceRegistry.startScan(new ThingTypeUID(EXTENDED_BINDING_ID, EXTENDED_THING_TYPE),  [
+            onFinished: { discoveryFinished = true },
+            onErrorOccurred: {
+            }
+        ] as ScanListener)
+        waitForAssert ({ assertTrue(discoveryFinished) }, 2000 )
+
+
+        // verify that the existing DiscoveryResult can be accessed
+        assertNotNull extendedDiscoveryServiceMock.discoveryServiceCallback.getExistingDiscoveryResult(thingUID)
+    }
+
+
 }

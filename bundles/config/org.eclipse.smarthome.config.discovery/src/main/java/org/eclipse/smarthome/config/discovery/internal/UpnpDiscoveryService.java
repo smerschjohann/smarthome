@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This is a {@link DiscoveryService} implementation, which can find UPnP devices in the network.
  * Support for further devices can be added by implementing and registering a {@link UpnpDiscoveryParticipant}.
- * 
+ *
  * @author Kai Kreuzer - Initial contribution
  * @author Andre Fuechsel - Added call of removeOlderResults
  *
@@ -67,7 +67,10 @@ public class UpnpDiscoveryService extends AbstractDiscoveryService implements Re
         if (upnpService != null) {
             Collection<RemoteDevice> devices = upnpService.getRegistry().getRemoteDevices();
             for (RemoteDevice device : devices) {
-                participant.createResult(device);
+                DiscoveryResult result = participant.createResult(device);
+                if (result != null) {
+                    thingDiscovered(result);
+                }
             }
         }
     }

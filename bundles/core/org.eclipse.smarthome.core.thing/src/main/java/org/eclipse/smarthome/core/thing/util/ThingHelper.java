@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,15 +10,18 @@ package org.eclipse.smarthome.core.thing.util;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.collections.iterators.ArrayIterator;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.Channel;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingUID;
+import org.eclipse.smarthome.core.thing.UID;
 import org.eclipse.smarthome.core.thing.binding.builder.BridgeBuilder;
-import org.eclipse.smarthome.core.thing.binding.builder.GenericThingBuilder;
 import org.eclipse.smarthome.core.thing.binding.builder.ThingBuilder;
 import org.eclipse.smarthome.core.thing.dto.ChannelDTO;
 import org.eclipse.smarthome.core.thing.dto.ChannelDTOMapper;
@@ -27,6 +30,7 @@ import org.eclipse.smarthome.core.thing.internal.BridgeImpl;
 import org.eclipse.smarthome.core.thing.internal.ThingImpl;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 
 /**
  * {@link ThingHelper} provides a utility method to create and bind items.
@@ -54,17 +58,20 @@ public class ThingHelper {
         if (!a.getUID().equals(b.getUID())) {
             return false;
         }
-        if (a.getBridgeUID() == null && b.getBridgeUID() != null) {
-            return false;
-        }
-        if (a.getBridgeUID() != null && !a.getBridgeUID().equals(b.getBridgeUID())) {
+        // bridge
+        if (!Objects.equal(a.getBridgeUID(), b.getBridgeUID())) {
             return false;
         }
         // configuration
-        if (a.getConfiguration() == null && b.getConfiguration() != null) {
+        if (!Objects.equal(a.getConfiguration(), b.getConfiguration())) {
             return false;
         }
-        if (a.getConfiguration() != null && !a.getConfiguration().equals(b.getConfiguration())) {
+        // label
+        if (!Objects.equal(a.getLabel(), b.getLabel())) {
+            return false;
+        }
+        // location
+        if (!Objects.equal(a.getLocation(), b.getLocation())) {
             return false;
         }
         // channels
@@ -82,14 +89,75 @@ public class ThingHelper {
     private static String toString(List<Channel> channels) {
         List<String> strings = new ArrayList<>(channels.size());
         for (Channel channel : channels) {
-            strings.add(channel.getUID().toString() + '#' + channel.getAcceptedItemType());
+            strings.add(channel.getUID().toString() + '#' + channel.getAcceptedItemType() + '#' + channel.getKind());
         }
         Collections.sort(strings);
         return Joiner.on(',').join(strings);
     }
 
     public static void addChannelsToThing(Thing thing, Collection<Channel> channels) {
-        ((ThingImpl) thing).getChannelsMutable().addAll(channels);
+        List<Channel> mutableChannels = ((ThingImpl) thing).getChannelsMutable();
+        ensureUniqueChannels(mutableChannels, channels);
+        mutableChannels.addAll(channels);
+    }
+
+    public static void ensureUnique(Collection<Channel> channels) {
+        HashSet<UID> ids = new HashSet<>();
+        for (Channel channel : channels) {
+            if (!ids.add(channel.getUID())) {
+                throw new IllegalArgumentException("Duplicate channels " + channel.getUID().getAsString());
+            }
+        }
+    }
+
+    /**
+     * Ensures that there are no duplicate channels in the array (i.e. not using the same ChannelUID)
+     *
+     * @param channels the channels to check
+     * @throws IllegalArgumentException in case there are duplicate channels found
+     */
+    public static void ensureUniqueChannels(final Channel[] channels) {
+        @SuppressWarnings("unchecked")
+        final Iterator<Channel> it = new ArrayIterator(channels);
+
+        ensureUniqueChannels(it, new HashSet<UID>(channels.length));
+    }
+
+    /**
+     * Ensures that there are no duplicate channels in the collection (i.e. not using the same ChannelUID)
+     *
+     * @param channels the channels to check
+     * @throws IllegalArgumentException in case there are duplicate channels found
+     */
+    public static void ensureUniqueChannels(final Collection<Channel> channels) {
+        ensureUniqueChannels(channels.iterator(), new HashSet<UID>(channels.size()));
+    }
+
+    /**
+     * Ensures that there are no duplicate channels in the collection plus the additional one (i.e. not using the same
+     * ChannelUID)
+     *
+     * @param channels the {@link List} of channels to check
+     * @param channel an additional channel
+     * @throws IllegalArgumentException in case there are duplicate channels found
+     */
+    public static void ensureUniqueChannels(final Collection<Channel> channels, final Channel channel) {
+        ensureUniqueChannels(channels, Collections.singleton(channel));
+    }
+
+    private static void ensureUniqueChannels(final Collection<Channel> channels1, final Collection<Channel> channels2) {
+        ensureUniqueChannels(channels1.iterator(),
+                ensureUniqueChannels(channels2.iterator(), new HashSet<UID>(channels1.size() + channels2.size())));
+    }
+
+    private static HashSet<UID> ensureUniqueChannels(final Iterator<Channel> channels, final HashSet<UID> ids) {
+        while (channels.hasNext()) {
+            final Channel channel = channels.next();
+            if (!ids.add(channel.getUID())) {
+                throw new IllegalArgumentException("Duplicate channels " + channel.getUID().getAsString());
+            }
+        }
+        return ids;
     }
 
     /**
@@ -106,7 +174,7 @@ public class ThingHelper {
      */
     public static Thing merge(Thing thing, ThingDTO updatedContents) {
 
-        GenericThingBuilder<?> builder;
+        ThingBuilder builder;
 
         if (thing instanceof Bridge) {
             builder = BridgeBuilder.create(thing.getThingTypeUID(), thing.getUID());
@@ -119,6 +187,13 @@ public class ThingHelper {
             builder.withLabel(updatedContents.label);
         } else {
             builder.withLabel(thing.getLabel());
+        }
+
+        // Update the location
+        if (updatedContents.location != null) {
+            builder.withLocation(updatedContents.location);
+        } else {
+            builder.withLocation(thing.getLocation());
         }
 
         // update bridge UID

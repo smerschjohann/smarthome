@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,6 +7,8 @@
  */
 package org.eclipse.smarthome.io.rest.core.item;
 
+import org.eclipse.smarthome.core.items.dto.GroupFunctionDTO;
+import org.eclipse.smarthome.core.items.dto.GroupItemDTO;
 import org.eclipse.smarthome.core.items.dto.ItemDTO;
 import org.eclipse.smarthome.core.types.StateDescription;
 
@@ -18,14 +20,16 @@ import org.eclipse.smarthome.core.types.StateDescription;
  */
 public class EnrichedGroupItemDTO extends EnrichedItemDTO {
 
-    public EnrichedGroupItemDTO(ItemDTO itemDTO, String groupType, EnrichedItemDTO[] members, String link, String state,
+    public EnrichedGroupItemDTO(ItemDTO itemDTO, EnrichedItemDTO[] members, String link, String state,
             StateDescription stateDescription) {
         super(itemDTO, link, state, stateDescription);
         this.members = members;
-        this.groupType = groupType;
+        this.groupType = ((GroupItemDTO) itemDTO).groupType;
+        this.function = ((GroupItemDTO) itemDTO).function;
     }
 
     public EnrichedItemDTO[] members;
     public String groupType;
+    public GroupFunctionDTO function;
 
 }

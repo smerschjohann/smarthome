@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,9 +10,12 @@ package org.eclipse.smarthome.core.library.types;
 import java.math.BigDecimal;
 import java.util.IllegalFormatConversionException;
 
+import org.eclipse.smarthome.core.library.internal.StateConverterUtil;
 import org.eclipse.smarthome.core.types.Command;
+import org.eclipse.smarthome.core.types.Convertible;
 import org.eclipse.smarthome.core.types.PrimitiveType;
 import org.eclipse.smarthome.core.types.State;
+import org.eclipse.smarthome.core.types.UnDefType;
 
 /**
  * The decimal type uses a BigDecimal internally and thus can be used for
@@ -21,7 +24,7 @@ import org.eclipse.smarthome.core.types.State;
  * @author Kai Kreuzer - Initial contribution and API
  *
  */
-public class DecimalType extends Number implements PrimitiveType, State, Command, Comparable<DecimalType> {
+public class DecimalType extends Number implements PrimitiveType, State, Command, Comparable<DecimalType>, Convertible {
 
     private static final long serialVersionUID = 4226845847123464690L;
 
@@ -38,7 +41,7 @@ public class DecimalType extends Number implements PrimitiveType, State, Command
     }
 
     public DecimalType(long value) {
-        this.value = new BigDecimal(value);
+        this.value = BigDecimal.valueOf(value);
     }
 
     public DecimalType(double value) {
@@ -51,6 +54,11 @@ public class DecimalType extends Number implements PrimitiveType, State, Command
 
     @Override
     public String toString() {
+        return toFullString();
+    }
+
+    @Override
+    public String toFullString() {
         return value.toPlainString();
     }
 
@@ -90,18 +98,23 @@ public class DecimalType extends Number implements PrimitiveType, State, Command
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (!(obj instanceof DecimalType))
+        }
+        if (!(obj instanceof DecimalType)) {
             return false;
+        }
         DecimalType other = (DecimalType) obj;
         if (value == null) {
-            if (other.value != null)
+            if (other.value != null) {
                 return false;
-        } else if (value.compareTo(other.value) != 0)
+            }
+        } else if (value.compareTo(other.value) != 0) {
             return false;
+        }
         return true;
     }
 
@@ -129,4 +142,35 @@ public class DecimalType extends Number implements PrimitiveType, State, Command
     public long longValue() {
         return value.longValue();
     }
+
+    @Override
+    public State as(Class<? extends State> target) {
+        if (target == OnOffType.class) {
+            return equals(ZERO) ? OnOffType.OFF : OnOffType.ON;
+        } else if (target == PercentType.class) {
+            return new PercentType(toBigDecimal().multiply(BigDecimal.valueOf(100)));
+        } else if (target == UpDownType.class) {
+            if (equals(ZERO)) {
+                return UpDownType.UP;
+            } else if (toBigDecimal().compareTo(BigDecimal.valueOf(1)) == 0) {
+                return UpDownType.DOWN;
+            } else {
+                return UnDefType.UNDEF;
+            }
+        } else if (target == OpenClosedType.class) {
+            if (equals(ZERO)) {
+                return OpenClosedType.CLOSED;
+            } else if (toBigDecimal().compareTo(BigDecimal.valueOf(1)) == 0) {
+                return OpenClosedType.OPEN;
+            } else {
+                return UnDefType.UNDEF;
+            }
+        } else if (target == HSBType.class) {
+            return new HSBType(DecimalType.ZERO, PercentType.ZERO,
+                    new PercentType(this.toBigDecimal().multiply(BigDecimal.valueOf(100))));
+        } else {
+            return StateConverterUtil.defaultConversion(this, target);
+        }
+    }
+
 }

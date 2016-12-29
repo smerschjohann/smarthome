@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,8 +7,7 @@
  */
 package org.eclipse.smarthome.core.library.types;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.*;
 
 import org.junit.Test;
 
@@ -38,6 +37,10 @@ public class StringTypeTest {
 
         assertEquals(true, expected1.equals("expected1"));
         assertEquals(false, expected1.equals("expected2"));
+
+        assertEquals(true, new StringType(null).equals(new StringType(null)));
+        assertEquals(false, new StringType("").equals(new StringType(null)));
+        assertEquals(false, new StringType(null).equals(new StringType("")));
     }
 
 }

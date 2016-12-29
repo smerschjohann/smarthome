@@ -1,6 +1,5 @@
 /**
- * Copyright (c) 2010-2015, openHAB.org and others.
- *
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,15 +8,13 @@
 package org.eclipse.smarthome.binding.fsinternetradio.internal.radio;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.commons.io.IOUtils;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,19 +23,24 @@ import org.slf4j.LoggerFactory;
  *
  * @author Rainer Ostendorf
  * @author Patrick Koenemann
+ * @author Svilen Valkanov - replaced Apache HttpClient with Jetty
+ * @author Mihaela Memova - changed the calling of the stopHttpClient() method, fixed the hardcoded URL path, fixed the for loop condition part
  */
 public class FrontierSiliconRadioConnection {
 
     private final Logger logger = LoggerFactory.getLogger(FrontierSiliconRadioConnection.class);
 
-    /** Timeout for HTTP requests. */
-    private final static int SOCKET_TIMEOUT = 5000; // ms
+    /** Timeout for HTTP requests in ms */
+    private final static int SOCKET_TIMEOUT = 5000;
 
     /** Hostname of the radio. */
     private final String hostname;
 
     /** Port number, usually 80. */
     private final int port;
+
+    /** URL path, must begin with a slash (/) */
+    private static final String path = "/fsapi";
 
     /** Access pin, passed upon login as GET parameter. */
     private final String pin;
@@ -58,6 +60,10 @@ public class FrontierSiliconRadioConnection {
         this.pin = pin;
     }
 
+    protected void deactivate() {
+        stopHttpClient(httpClient);
+    }
+
     /**
      * Perform login/establish a new session. Uses the PIN number and when successful saves the assigned sessionID for
      * future requests.
@@ -72,27 +78,29 @@ public class FrontierSiliconRadioConnection {
             httpClient = new HttpClient();
         }
 
-        final String url = "http://" + hostname + ":" + port + "/fsapi/CREATE_SESSION?pin=" + pin;
+        startHttpClient(httpClient);
 
-        logger.trace("opening URL:" + url);
+        final String url = "http://" + hostname + ":" + port + path + "/CREATE_SESSION?pin=" + pin;
 
-        final HttpMethod method = new GetMethod(url);
-        method.getParams().setSoTimeout(SOCKET_TIMEOUT);
-        method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER, new DefaultHttpMethodRetryHandler(3, false));
+        logger.trace("opening URL: {}", url);
+
+        Request request = httpClient.newRequest(url).method(HttpMethod.GET).timeout(SOCKET_TIMEOUT, TimeUnit.MILLISECONDS);
 
         try {
-            final int statusCode = httpClient.executeMethod(method);
-            if (statusCode != HttpStatus.SC_OK) {
-                logger.debug("Communication with radio failed: " + method.getStatusLine());
-                if (method.getStatusCode() == 403) {
+            ContentResponse response = request.send();
+            int statusCode = response.getStatus();
+            if (statusCode != HttpStatus.OK_200) {
+                String reason = response.getReason();
+                logger.debug("Communication with radio failed: {} {}", statusCode, reason);
+                if (statusCode == HttpStatus.FORBIDDEN_403) {
                     throw new RuntimeException("Radio does not allow connection, maybe wrong pin?");
                 }
                 throw new IOException("Communication with radio failed, return code: " + statusCode);
             }
 
-            final String responseBody = IOUtils.toString(method.getResponseBodyAsStream());
+            final String responseBody = response.getContentAsString();
             if (!responseBody.isEmpty()) {
-                logger.trace("login response: " + responseBody);
+                logger.trace("login response: {}", responseBody);
             }
 
             final FrontierSiliconRadioApiResult result = new FrontierSiliconRadioApiResult(responseBody);
@@ -103,15 +111,11 @@ public class FrontierSiliconRadioConnection {
                 return true; // login successful :-)
             }
 
-        } catch (HttpException he) {
-            logger.debug("Fatal protocol violation: {}", he.toString());
-            throw he;
-        } catch (IOException ioe) {
-            logger.debug("Fatal transport error: {}", ioe.toString());
-            throw ioe;
-        } finally {
-            method.releaseConnection();
+        } catch (Exception e) {
+            logger.debug("Fatal transport error: {}", e.toString());
+            throw new IOException(e);
         }
+
         return false; // login not successful
     }
 
@@ -144,38 +148,38 @@ public class FrontierSiliconRadioConnection {
     public FrontierSiliconRadioApiResult doRequest(String requestString, String params) throws IOException {
 
         // 3 retries upon failure
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 3; i++) {
             if (!isLoggedIn && !doLogin()) {
                 continue; // not logged in and login was not successful - try again!
             }
 
-            final String url = "http://" + hostname + ":" + port + "/fsapi/" + requestString + "?pin=" + pin + "&sid="
+            final String url = "http://" + hostname + ":" + port + path + "/" + requestString + "?pin=" + pin + "&sid="
                     + sessionId + (params == null || params.trim().length() == 0 ? "" : "&" + params);
 
-            logger.trace("calling url: '" + url + "'");
+            logger.trace("calling url: '{}'", url);
 
-            final HttpMethod method = new GetMethod(url);
-            method.getParams().setSoTimeout(SOCKET_TIMEOUT);
-            method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
-                    new DefaultHttpMethodRetryHandler(2, false));
+            // HttpClient can not be null, instance is created in doLogin() method
+            startHttpClient(httpClient);
+
+            Request request = httpClient.newRequest(url).method(HttpMethod.GET).timeout(SOCKET_TIMEOUT,
+                    TimeUnit.MILLISECONDS);
 
             try {
-
-                final int statusCode = httpClient.executeMethod(method);
-                if (statusCode != HttpStatus.SC_OK) {
-                    logger.warn("Method failed: " + method.getStatusLine());
+                ContentResponse response = request.send();
+                final int statusCode = response.getStatus();
+                if (statusCode != HttpStatus.OK_200) {
+                    String reason = response.getReason();
+                    logger.warn("Method failed: {}  {}", statusCode, reason);
                     isLoggedIn = false;
-                    method.releaseConnection();
                     continue;
                 }
 
-                final String responseBody = IOUtils.toString(method.getResponseBodyAsStream());
+                final String responseBody = response.getContentAsString();
                 if (!responseBody.isEmpty()) {
-                    logger.trace("got result: " + responseBody);
+                    logger.trace("got result: {}", responseBody);
                 } else {
                     logger.debug("got empty result");
                     isLoggedIn = false;
-                    method.releaseConnection();
                     continue;
                 }
 
@@ -185,20 +189,33 @@ public class FrontierSiliconRadioConnection {
                 }
 
                 isLoggedIn = false;
-                method.releaseConnection();
                 continue; // try again
-            } catch (HttpException he) {
-                logger.error("Fatal protocol violation: {}", he.toString());
-                isLoggedIn = false;
-                throw he;
-            } catch (IOException ioe) {
-                logger.error("Fatal transport error: {}", ioe.toString());
-                throw ioe;
-            } finally {
-                method.releaseConnection();
+            } catch (Exception e) {
+                logger.error("Fatal transport error: {}", e.toString());
+                throw new IOException(e);
             }
         }
         isLoggedIn = false; // 3 tries failed. log in again next time, maybe our session went invalid (radio restarted?)
         return null;
+    }
+
+    private void startHttpClient(HttpClient client) {
+        if (!client.isStarted()) {
+            try {
+                client.start();
+            } catch (Exception e1) {
+                logger.warn("Can not start HttpClient !", e1);
+            }
+        }
+    }
+
+    private void stopHttpClient(HttpClient client) {
+        if (client.isStarted()) {
+            try {
+                client.stop();
+            } catch (Exception e) {
+                logger.error("Unable to stop HttpClient !", e);
+            }
+        }
     }
 }

@@ -4,10 +4,8 @@ angular.module('PaperUI.controllers').service('sharedProperties', function() {
     var triggersArray = [];
     var actionsArray = [];
     var conditionsArray = [];
-    var tId = 1, aId = 1, cId = 1;
     var params = [];
     var moduleTypes = [];
-    var isDirty = false;
     return {
         updateParams : function(elem) {
             params.push(elem);
@@ -29,18 +27,16 @@ angular.module('PaperUI.controllers').service('sharedProperties', function() {
         },
         updateModule : function(type, value) {
             var modArr = this.getModuleArray(type);
-
+            var maxId = this.getMaxModuleId();
             if (!value.id) {
-                value.id = type + "_" + tId;
+                value.id = maxId;
                 modArr.push(value);
-                tId++;
             } else {
                 var index = this.searchArray(modArr, value.id);
                 if (index != -1) {
                     modArr[index] = value;
                 } else {
                     modArr.push(value);
-                    tId++;
                 }
             }
         },
@@ -61,7 +57,7 @@ angular.module('PaperUI.controllers').service('sharedProperties', function() {
             angular.forEach(modArr, function(value) {
                 var type = typeof value.uid === "undefined" ? value.type : value.uid;
                 $moduleJSON.push({
-                    "id" : value.id ? value.id : modArr.mtype + "_" + i,
+                    "id" : value.id,
                     "label" : value.label,
                     "description" : value.description,
                     "type" : type,
@@ -76,10 +72,6 @@ angular.module('PaperUI.controllers').service('sharedProperties', function() {
             triggersArray = [];
             actionsArray = [];
             conditionsArray = [];
-            tId = 1;
-            aId = 1;
-            cId = 1;
-
         },
         removeFromArray : function(opt, id) {
             var arr = null;
@@ -133,39 +125,61 @@ angular.module('PaperUI.controllers').service('sharedProperties', function() {
 
         setModuleTypes : function(mTypes) {
             moduleTypes = mTypes;
+        },
+        getMaxModuleId : function() {
+            var max_id = 0;
+            var modules = [ 'trigger', 'action', 'condition' ];
+            for (var m = 0; m < modules.length; m++) {
+                var modArr = this.getModuleArray(modules[m]);
+                for (var i = 0; i < modArr.length; i++) {
+                    if (modArr[i].id && !isNaN(parseInt(modArr[i].id)) && parseInt(modArr[i].id) > max_id) {
+                        max_id = parseInt(modArr[i].id);
+                    }
+                }
+            }
+            return ++max_id;
         }
     }
 });
 angular.module('PaperUI.constants').constant('itemConfig', {
-    'types' : [ {
-        name : "SwitchItem",
-        value : "Switch"
+    'types' : [ 'Switch', 'Contact', 'String', 'Number', 'Dimmer', 'DateTime', 'Color', 'Image', 'Player', 'Location', 'Rollershutter', 'Group' ],
+    'groupTypes' : [ 'Switch', 'Contact', 'Number', 'Dimmer', 'None' ],
+    'arithmeticFunctions' : [ {
+        name : "AVG",
+        value : "AVG"
     }, {
-        name : "ContactItem",
-        value : "Contact"
+        name : "MAX",
+        value : "MAX"
     }, {
-        name : "StringItem",
-        value : "String"
+        name : "MIN",
+        value : "MIN"
     }, {
-        name : "NumberItem",
-        value : "Number"
+        name : "SUM",
+        value : "SUM"
+    } ],
+    'logicalFunctions' : [ {
+        name : "AND_ON_OFF",
+        value : "All ON → ON else OFF"
     }, {
-        name : "DimmerItem",
-        value : "Dimmer"
+        name : "NAND_ON_OFF",
+        value : "All ON → OFF else ON"
     }, {
-        name : "DateTimeItem",
-        value : "DateTime"
+        name : "OR_OFF_ON",
+        value : "All OFF → OFF else ON"
     }, {
-        name : "ColorItem",
-        value : "Color"
+        name : "NOR_ON_OFF",
+        value : "All OFF → ON else OFF"
     }, {
-        name : "ImageItem",
-        value : "Image"
+        name : "OR_ON_OFF",
+        value : "One ON → ON else OFF"
     }, {
-        name : "PlayerItem",
-        value : "Player"
+        name : "NOR_ON_OFF",
+        value : "One ON → OFF else ON"
     }, {
-        name : "LocationItem",
-        value : "Location"
+        name : "AND_OFF_ON",
+        value : "One OFF → OFF else ON"
+    }, {
+        name : "NAND_OFF_ON",
+        value : "One OFF → ON else OFF"
     } ]
 });

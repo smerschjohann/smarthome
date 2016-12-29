@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,6 +12,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -24,30 +25,35 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.eclipse.smarthome.config.core.BundleProcessor;
+import org.eclipse.smarthome.config.core.BundleProcessorVetoManager;
 import org.eclipse.smarthome.config.core.ConfigDescription;
 import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
 import org.eclipse.smarthome.config.core.ConfigDescriptionRegistry;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.common.SafeMethodCaller;
 import org.eclipse.smarthome.core.common.ThreadPoolManager;
+import org.eclipse.smarthome.core.common.registry.ManagedProvider;
+import org.eclipse.smarthome.core.common.registry.Provider;
 import org.eclipse.smarthome.core.events.EventPublisher;
+import org.eclipse.smarthome.core.items.Item;
+import org.eclipse.smarthome.core.items.ItemUtil;
 import org.eclipse.smarthome.core.items.events.AbstractItemEventSubscriber;
 import org.eclipse.smarthome.core.items.events.ItemCommandEvent;
 import org.eclipse.smarthome.core.items.events.ItemEventFactory;
 import org.eclipse.smarthome.core.items.events.ItemStateEvent;
 import org.eclipse.smarthome.core.thing.Bridge;
-import org.eclipse.smarthome.core.thing.BundleProcessor;
-import org.eclipse.smarthome.core.thing.BundleProcessor.BundleProcessorListener;
 import org.eclipse.smarthome.core.thing.Channel;
 import org.eclipse.smarthome.core.thing.ChannelUID;
-import org.eclipse.smarthome.core.thing.ManagedThingProvider;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingRegistry;
 import org.eclipse.smarthome.core.thing.ThingStatus;
 import org.eclipse.smarthome.core.thing.ThingStatusDetail;
 import org.eclipse.smarthome.core.thing.ThingStatusInfo;
+import org.eclipse.smarthome.core.thing.ThingTypeMigrationService;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.ThingUID;
+import org.eclipse.smarthome.core.thing.binding.BridgeHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerCallback;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerFactory;
@@ -56,38 +62,40 @@ import org.eclipse.smarthome.core.thing.events.ThingEventFactory;
 import org.eclipse.smarthome.core.thing.link.ItemChannelLinkRegistry;
 import org.eclipse.smarthome.core.thing.type.ThingType;
 import org.eclipse.smarthome.core.thing.type.ThingTypeRegistry;
+import org.eclipse.smarthome.core.thing.util.ThingHandlerHelper;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.State;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.ServiceReference;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.event.EventHandler;
-import org.osgi.util.tracker.ServiceTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.google.common.collect.SetMultimap;
 
 /**
  * {@link ThingManager} tracks all things in the {@link ThingRegistry} and
  * mediates the communication between the {@link Thing} and the {@link ThingHandler} from the binding. Therefore it
  * tracks {@link ThingHandlerFactory}s and calls {@link ThingHandlerFactory#registerHandler(Thing)} for each thing, that
- * was
- * added to the {@link ThingRegistry}. In addition the {@link ThingManager} acts
+ * was added to the {@link ThingRegistry}. In addition the {@link ThingManager} acts
  * as an {@link EventHandler} and subscribes to smarthome update and command
- * events.
+ * events. Finally the {@link ThingManager} implement the {@link ThingTypeMigrationService} to offer
+ * a way to change the thing type of a {@link Thing}.
  *
  * @author Dennis Nobel - Initial contribution
  * @author Michael Grammling - Added dynamic configuration update
  * @author Stefan Bußweiler - Added new thing status handling, migration to new event mechanism,
- *         refactorings thing life cycle
- * @author Simon Kaufmann - Added remove handling
- * @author Kai Kreuzer - Removed usage of itemRegistry and thingLinkRegistry
+ *         refactorings due to thing/bridge life cycle
+ * @author Simon Kaufmann - Added remove handling, type conversion
+ * @author Kai Kreuzer - Removed usage of itemRegistry and thingLinkRegistry, fixed vetoing mechanism
+ * @author Andre Fuechsel - Added the {@link ThingTypeMigrationService} 
  */
-public class ThingManager extends AbstractItemEventSubscriber implements ThingTracker, BundleProcessorListener {
+public class ThingManager extends AbstractItemEventSubscriber implements ThingTracker, ThingTypeMigrationService {
 
     private static final String FORCEREMOVE_THREADPOOL_NAME = "forceRemove";
 
@@ -95,56 +103,12 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
     private final Multimap<Bundle, Object> initializerVetoes = Multimaps
             .synchronizedListMultimap(LinkedListMultimap.<Bundle, Object> create());
-    private final Multimap<String, ThingHandler> initializerQueue = Multimaps
-            .synchronizedListMultimap(LinkedListMultimap.<String, ThingHandler> create());
-
-    private final class ThingHandlerTracker extends ServiceTracker<ThingHandler, ThingHandler> {
-
-        public ThingHandlerTracker(BundleContext context) {
-            super(context, ThingHandler.class.getName(), null);
-        }
-
-        @Override
-        public ThingHandler addingService(ServiceReference<ThingHandler> reference) {
-            ThingUID thingId = getThingUID(reference);
-
-            logger.debug("Thing handler for thing '{}' added.", thingId);
-
-            ThingHandler thingHandler = bundleContext.getService(reference);
-            Thing thing = getThing(thingId);
-
-            if (thing != null) {
-                handlerAdded(thing, thingHandler);
-            } else {
-                logger.warn("Found handler for non-existing thing '{}'.", thingId);
-            }
-
-            thingHandlers.put(thingId, thingHandler);
-            return thingHandler;
-        }
-
-        @Override
-        public void removedService(ServiceReference<ThingHandler> reference, ThingHandler service) {
-            ThingUID thingUID = getThingUID(reference);
-            logger.debug("Thing handler for thing '{}' removed.", thingUID);
-            Thing thing = getThing(thingUID);
-            if (thing != null) {
-                handlerRemoved(thing, service);
-            }
-            thingHandlers.remove(thingUID);
-        }
-
-        private ThingUID getThingUID(ServiceReference<ThingHandler> reference) {
-            return (ThingUID) reference.getProperty(ThingHandler.SERVICE_PROPERTY_THING_ID);
-        }
-
-    }
+    private final Multimap<Long, ThingHandler> initializerQueue = Multimaps
+            .synchronizedListMultimap(LinkedListMultimap.<Long, ThingHandler> create());
 
     private Logger logger = LoggerFactory.getLogger(ThingManager.class);
 
     private final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool("thingManager");
-
-    private BundleContext bundleContext;
 
     private EventPublisher eventPublisher;
 
@@ -154,7 +118,8 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
     private Map<ThingUID, ThingHandler> thingHandlers = new ConcurrentHashMap<>();
 
-    private ThingHandlerTracker thingHandlerTracker;
+    private final SetMultimap<ThingHandlerFactory, ThingHandler> thingHandlersByFactory = Multimaps
+            .synchronizedSetMultimap(HashMultimap.<ThingHandlerFactory, ThingHandler> create());
 
     private ThingTypeRegistry thingTypeRegistry;
 
@@ -162,80 +127,111 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
         @Override
         public void stateUpdated(ChannelUID channelUID, State state) {
-            Set<String> items = itemChannelLinkRegistry.getLinkedItems(channelUID);
-            for (String item : items) {
-                eventPublisher.post(ItemEventFactory.createStateEvent(item, state, channelUID.toString()));
+            Set<Item> items = itemChannelLinkRegistry.getLinkedItems(channelUID);
+            for (Item item : items) {
+                State acceptedState = ItemUtil.convertToAcceptedState(state, item);
+                eventPublisher
+                        .post(ItemEventFactory.createStateEvent(item.getName(), acceptedState, channelUID.toString()));
             }
         }
 
         @Override
         public void postCommand(ChannelUID channelUID, Command command) {
-            Set<String> items = itemChannelLinkRegistry.getLinkedItems(channelUID);
+            Set<String> items = itemChannelLinkRegistry.getLinkedItemNames(channelUID);
             for (String item : items) {
                 eventPublisher.post(ItemEventFactory.createCommandEvent(item, command, channelUID.toString()));
             }
         }
 
         @Override
-        public void statusUpdated(final Thing thing, ThingStatusInfo thingStatus) {
-            // all provoked operations based on a status update should be executed asynchronously!
+        public void statusUpdated(Thing thing, ThingStatusInfo statusInfo) {
+            // note: all provoked operations based on a status update should be executed asynchronously!
+            ensureValidStatus(statusInfo.getStatus());
 
-            if (ThingStatus.REMOVING.equals(thing.getStatus())
-                    && !ThingStatus.REMOVED.equals(thingStatus.getStatus())) {
+            ThingStatusInfo oldStatusInfo = thing.getStatusInfo();
+            if (ThingStatus.REMOVING.equals(oldStatusInfo.getStatus())
+                    && !ThingStatus.REMOVED.equals(statusInfo.getStatus())) {
                 // only allow REMOVING -> REMOVED transition and ignore all other state changes
                 return;
             }
-            ThingStatusInfo oldStatusInfo = thing.getStatusInfo();
 
-            // update thing status and send event with new status
-            setThingStatus(thing, thingStatus);
+            if (ThingStatus.UNKNOWN.equals(statusInfo.getStatus())
+                    && !ThingStatus.INITIALIZING.equals(oldStatusInfo.getStatus())) {
+                // only allow UNKNOWN in the beginning, not after ONLINE or OFFLINE
+                return;
+            }
 
-            // if thing is a bridge:
-            if (thing instanceof Bridge) {
-                Bridge bridge = (Bridge) thing;
-                // notify all child-things about bridge initialization
-                if (oldStatusInfo.getStatus() == ThingStatus.INITIALIZING && isInitialized(thing)) {
-                    notifyThingsAboutBridgeInitialization(bridge);
-                }
-                // update status of child-things
-                updateThingStatus(thingStatus, bridge);
-                // notify child-things about bridge status change, if bridge status is ONLINE/OFFLINE
-                if (!oldStatusInfo.equals(thingStatus)) {
-                    notifyThingsAboutBridgeStatusChange(thingStatus, bridge);
-                }
+            // update thing status and send event about new status
+            setThingStatus(thing, statusInfo);
+
+            // if thing is a bridge
+            if (isBridge(thing)) {
+                handleBridgeStatusUpdate((Bridge) thing, statusInfo, oldStatusInfo);
             }
-            // if thing has a bridge: determine if bridge has been initialized and notify thing handler about it
-            if (thing.getBridgeUID() != null && oldStatusInfo.getStatus() == ThingStatus.INITIALIZING
-                    && isInitialized(thing)) {
-                notifyThingAboutBridgeInitialization(thing);
-            }
-            // notify thing about its removal
-            if (ThingStatus.REMOVING.equals(thing.getStatus())) {
-                notifyThingAboutRemoval(thing);
+            // if thing has a bridge
+            if (hasBridge(thing)) {
+                handleBridgeChildStatusUpdate(thing, oldStatusInfo);
             }
             // notify thing registry about thing removal
-            else if (ThingStatus.REMOVED.equals(thing.getStatus())) {
+            if (ThingStatus.REMOVED.equals(thing.getStatus())) {
                 notifyRegistryAboutForceRemove(thing);
+            }
+        }
+
+        private void ensureValidStatus(ThingStatus status) {
+            if (!(ThingStatus.UNKNOWN.equals(status) || ThingStatus.ONLINE.equals(status)
+                    || ThingStatus.OFFLINE.equals(status) || ThingStatus.REMOVED.equals(status))) {
+                throw new IllegalArgumentException(
+                        MessageFormat.format("Illegal status {0}. Bindings only may set {1}, {2}, {3} or {4}.", status,
+                                ThingStatus.UNKNOWN, ThingStatus.ONLINE, ThingStatus.OFFLINE, ThingStatus.REMOVED));
+            }
+        }
+
+        private void handleBridgeStatusUpdate(Bridge bridge, ThingStatusInfo statusInfo,
+                ThingStatusInfo oldStatusInfo) {
+            if (ThingHandlerHelper.isHandlerInitialized(bridge)
+                    && (ThingStatus.INITIALIZING.equals(oldStatusInfo.getStatus()))) {
+                // bridge has just been initialized: initialize child things as well
+                registerChildHandlers(bridge);
+            } else if (!statusInfo.equals(oldStatusInfo)) {
+                // bridge status has been changed: notify child things about status change
+                notifyThingsAboutBridgeStatusChange(bridge, statusInfo);
+            }
+        }
+
+        private void handleBridgeChildStatusUpdate(Thing thing, ThingStatusInfo oldStatusInfo) {
+            if (ThingHandlerHelper.isHandlerInitialized(thing)
+                    && ThingStatus.INITIALIZING.equals(oldStatusInfo.getStatus())) {
+                // child thing has just been initialized: notify bridge about it
+                notifyBridgeAboutChildHandlerInitialization(thing);
             }
         }
 
         @Override
         public void thingUpdated(final Thing thing) {
             thingUpdatedLock.add(thing.getUID());
-            Thing ret = AccessController.doPrivileged(new PrivilegedAction<Thing>() {
-
+            AccessController.doPrivileged(new PrivilegedAction<Void>() {
                 @Override
-                public Thing run() {
-                    return managedThingProvider.update(thing);
+                public Void run() {
+                    Provider<Thing> provider = thingRegistry.getProvider(thing);
+                    if (provider == null) {
+                        throw new IllegalArgumentException(MessageFormat.format(
+                                "Provider for thing {0} cannot be determined because it is not known to the registry",
+                                thing.getUID().getAsString()));
+                    }
+                    if (provider instanceof ManagedProvider) {
+                        @SuppressWarnings("unchecked")
+                        ManagedProvider<Thing, ThingUID> managedProvider = (ManagedProvider<Thing, ThingUID>) provider;
+                        managedProvider.update(thing);
+                    } else {
+                        logger.debug("Only updating thing {} in the registry because provider {} is not managed.",
+                                thing.getUID().getAsString(), provider);
+                        thingRegistry.updated(provider, thingRegistry.get(thing.getUID()), thing);
+                    }
+                    return null;
                 }
-
             });
             thingUpdatedLock.remove(thing.getUID());
-            if (ret == null) {
-                throw new IllegalStateException(
-                        MessageFormat.format("Could not update thing {0}. Most likely because it is read-only.",
-                                thing.getUID().getAsString()));
-            }
         }
 
         @Override
@@ -244,79 +240,14 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
         }
 
         @Override
-        public void changeThingType(final Thing thing, final ThingTypeUID thingTypeUID,
+        public void migrateThingType(final Thing thing, final ThingTypeUID thingTypeUID,
                 final Configuration configuration) {
-            scheduler.schedule(new Runnable() {
-                @Override
-                public void run() {
-                    ThingUID thingUID = thing.getUID();
-                    waitForRunningHandlerRegistrations(thingUID);
-                    ThingType thingType = thingTypeRegistry.getThingType(thingTypeUID);
+            ThingManager.this.migrateThingType(thing, thingTypeUID, configuration);
+        }
 
-                    // Remove the ThingHandler
-                    final ThingHandlerFactory oldThingHandlerFactory = findThingHandlerFactory(thing.getThingTypeUID());
-                    if (oldThingHandlerFactory != null) {
-                        unregisterHandler(thing, oldThingHandlerFactory);
-                        waitUntilHandlerUnregistered(thing, 60 * 1000);
-                    } else {
-                        throw new RuntimeException(
-                                "No ThingHandlerFactory available that can handle " + thing.getThingTypeUID());
-                    }
-
-                    // Set the new channels
-                    List<Channel> channels = ThingFactoryHelper.createChannels(thingType, thingUID,
-                            configDescriptionRegistry);
-                    ((ThingImpl) thing).setChannels(channels);
-
-                    // Set the given configuration
-                    ThingFactoryHelper.applyDefaultConfiguration(configuration, thingType, configDescriptionRegistry);
-                    ((ThingImpl) thing).setConfiguration(configuration);
-
-                    // Change the ThingType
-                    ((ThingImpl) thing).setThingTypeUID(thingTypeUID);
-
-                    // Register the new Handler - ThingManager.updateThing() is going to take care of that
-                    thingRegistry.update(thing);
-
-                    logger.debug("Changed ThingType of Thing {} to {}. New ThingHandler is {}.",
-                            thing.getUID().toString(), thing.getThingTypeUID(), thing.getHandler().toString());
-                }
-
-                private void waitUntilHandlerUnregistered(final Thing thing, int timeout) {
-                    for (int i = 0; i < timeout / 100; i++) {
-                        if (thing.getHandler() == null && thingHandlers.get(thing.getUID()) == null) {
-                            return;
-                        }
-                        try {
-                            Thread.sleep(100);
-                            logger.debug("Waiting for handler deregistration to complete for thing {}. Took already {}ms.",
-                                    thing.getUID().getAsString(), i * 100);
-                        } catch (InterruptedException e) {
-                            return;
-                        }
-                    }
-                    throw new RuntimeException(MessageFormat.format(
-                            "Thing type migration failed for {0}. The handler deregistration did not complete within {1}ms.",
-                            thing.getUID().getAsString(), timeout));
-                }
-
-                private void waitForRunningHandlerRegistrations(ThingUID thingUID) {
-                    for (int i = 0; i < 10 * 10; i++) {
-                        if (!registerHandlerLock.contains(thingUID)) {
-                            return;
-                        }
-                        try {
-                            // Wait a little to give running handler registrations a chance to complete...
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
-                            return;
-                        }
-                    }
-                    throw new RuntimeException(MessageFormat.format(
-                            "Thing type migration failed for {0}. Could not obtain lock for hander registration.",
-                            thingUID.getAsString()));
-                }
-            }, 0, TimeUnit.MILLISECONDS);
+        @Override
+        public void channelTriggered(Thing thing, ChannelUID channelUID, String event) {
+            eventPublisher.post(ThingEventFactory.createTriggerEvent(event, channelUID));
         }
 
     };
@@ -324,8 +255,6 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
     private ThingRegistryImpl thingRegistry;
 
     private ConfigDescriptionRegistry configDescriptionRegistry;
-
-    private ManagedThingProvider managedThingProvider;
 
     private Set<Thing> things = new CopyOnWriteArraySet<>();
 
@@ -335,40 +264,90 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
     private Set<BundleProcessor> bundleProcessors = new HashSet<>();
 
-    /**
-     * Method is called when a {@link ThingHandler} is added.
-     *
-     * @param thing
-     *            thing
-     * @param thingHandler
-     *            thing handler
-     */
-    public void handlerAdded(Thing thing, ThingHandler thingHandler) {
-        logger.debug("Assigning handler for thing '{}'.", thing.getUID());
-        thingHandler.setCallback(this.thingHandlerCallback);
-        thing.setHandler(thingHandler);
-        initializeHandler(thing);
-    }
-
-    /**
-     * Method is called when a {@link ThingHandler} is removed.
-     *
-     * @param thing
-     *            thing
-     * @param thingHandler
-     *            thing handler
-     */
-    public void handlerRemoved(Thing thing, ThingHandler thingHandler) {
-        logger.debug("Unassigning handler for thing '{}' and setting status to UNINITIALIZED.", thing.getUID());
-        thing.setHandler(null);
-        ThingStatusInfo statusInfo = buildStatusInfo(ThingStatus.UNINITIALIZED,
-                ThingStatusDetail.HANDLER_MISSING_ERROR);
-        setThingStatus(thing, statusInfo);
-        thingHandler.setCallback(null);
-        disposeHandler(thing, thingHandler);
-        if (thing instanceof Bridge) {
-            notifyThingsAboutBridgeDisposal((Bridge) thing);
+    @Override
+    public void migrateThingType(final Thing thing, final ThingTypeUID thingTypeUID,
+            final Configuration configuration) {
+        final ThingType thingType = thingTypeRegistry.getThingType(thingTypeUID);
+        if (thingType == null) {
+            throw new RuntimeException(
+                    MessageFormat.format("No thing type {0} registered, cannot change thing type for thing {1}",
+                            thingTypeUID.getAsString(), thing.getUID().getAsString()));
         }
+        scheduler.schedule(new Runnable() {
+            @Override
+            public void run() {
+                ThingUID thingUID = thing.getUID();
+                waitForRunningHandlerRegistrations(thingUID);
+
+                // Remove the ThingHandler, if any
+                final ThingHandlerFactory oldThingHandlerFactory = findThingHandlerFactory(thing.getThingTypeUID());
+                if (oldThingHandlerFactory != null) {
+                    ThingHandler thingHandler = thing.getHandler();
+                    unregisterHandler(thing, oldThingHandlerFactory);
+                    disposeHandler(thing, thingHandler);
+                    waitUntilHandlerUnregistered(thing, 60 * 1000);
+                } else {
+                    logger.debug("No ThingHandlerFactory available that can handle {}", thing.getThingTypeUID());
+                }
+
+                // Set the new channels
+                List<Channel> channels = ThingFactoryHelper.createChannels(thingType, thingUID,
+                        configDescriptionRegistry);
+                ((ThingImpl) thing).setChannels(channels);
+
+                // Set the given configuration
+                ThingFactoryHelper.applyDefaultConfiguration(configuration, thingType, configDescriptionRegistry);
+                ((ThingImpl) thing).setConfiguration(configuration);
+
+                // Change the ThingType
+                ((ThingImpl) thing).setThingTypeUID(thingTypeUID);
+
+                // Register the new Handler - ThingManager.updateThing() is going to take care of that
+                thingRegistry.update(thing);
+
+                logger.debug("Changed ThingType of Thing {} to {}. New ThingHandler is {}.", thing.getUID().toString(),
+                        thing.getThingTypeUID(), thing.getHandler().toString());
+            }
+
+            private void waitUntilHandlerUnregistered(final Thing thing, int timeout) {
+                for (int i = 0; i < timeout / 100; i++) {
+                    if (thing.getHandler() == null && thingHandlers.get(thing.getUID()) == null) {
+                        return;
+                    }
+                    try {
+                        Thread.sleep(100);
+                        logger.debug("Waiting for handler deregistration to complete for thing {}. Took already {}ms.",
+                                thing.getUID().getAsString(), (i + 1) * 100);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+                String message = MessageFormat.format(
+                        "Thing type migration failed for {0}. The handler deregistration did not complete within {1}ms.",
+                        thing.getUID().getAsString(), timeout);
+                logger.error(message);
+                throw new RuntimeException(message);
+            }
+
+            private void waitForRunningHandlerRegistrations(ThingUID thingUID) {
+                for (int i = 0; i < 10 * 10; i++) {
+                    if (!registerHandlerLock.contains(thingUID)) {
+                        return;
+                    }
+                    try {
+                        // Wait a little to give running handler registrations a chance to complete...
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+                String message = MessageFormat.format(
+                        "Thing type migration failed for {0}. Could not obtain lock for hander registration.",
+                        thingUID.getAsString());
+                logger.error(message);
+                throw new RuntimeException(message);
+            }
+        }, 0, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -383,7 +362,7 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                 if (thing != null) {
                     final ThingHandler handler = thing.getHandler();
                     if (handler != null) {
-                        if (isInitialized(thing)) {
+                        if (ThingHandlerHelper.isHandlerInitialized(thing)) {
                             logger.debug("Delegating command '{}' for item '{}' to handler for channel '{}'", command,
                                     itemName, channelUID);
                             try {
@@ -398,12 +377,12 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                                 logger.warn("Handler for thing '{}' takes more than {}ms for processing event",
                                         handler.getThing().getUID(), SafeMethodCaller.DEFAULT_TIMEOUT);
                             } catch (Exception ex) {
-                                logger.error("Exception occured while calling handler: " + ex.getMessage(), ex);
+                                logger.error("Exception occured while calling handler: {}", ex.getMessage(), ex);
                             }
                         } else {
                             logger.info(
                                     "Not delegating command '{}' for item '{}' to handler for channel '{}', "
-                                            + "because thing is not initialized (must be in status ONLINE or OFFLINE).",
+                                            + "because handler is not initialized (thing must be in status UNKNOWN, ONLINE or OFFLINE).",
                                     command, itemName, channelUID);
                         }
                     } else {
@@ -433,7 +412,7 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                 if (thing != null) {
                     final ThingHandler handler = thing.getHandler();
                     if (handler != null) {
-                        if (isInitialized(thing)) {
+                        if (ThingHandlerHelper.isHandlerInitialized(thing)) {
                             logger.debug("Delegating update '{}' for item '{}' to handler for channel '{}'", newState,
                                     itemName, channelUID);
                             try {
@@ -448,12 +427,12 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                                 logger.warn("Handler for thing {} takes more than {}ms for processing event",
                                         handler.getThing().getUID(), SafeMethodCaller.DEFAULT_TIMEOUT);
                             } catch (Exception ex) {
-                                logger.error("Exception occured while calling handler: " + ex.getMessage(), ex);
+                                logger.error("Exception occured while calling handler: {}", ex.getMessage(), ex);
                             }
                         } else {
                             logger.info(
                                     "Not delegating update '{}' for item '{}' to handler for channel '{}', "
-                                            + "because thing is not initialized (must be in status ONLINE or OFFLINE).",
+                                            + "because handler is not initialized (thing must be in status UNKNOWN, ONLINE or OFFLINE).",
                                     newState, itemName, channelUID);
                         }
                     } else {
@@ -475,28 +454,30 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
     public void thingAdded(Thing thing, ThingTrackerEvent thingTrackerEvent) {
         this.things.add(thing);
         logger.debug("Thing '{}' is tracked by ThingManager.", thing.getUID());
-        ThingHandler thingHandler = thingHandlers.get(thing.getUID());
-        if (thingHandler == null) {
-            registerHandler(thing);
+
+        if (!isHandlerRegistered(thing)) {
+            registerAndInitializeHandler(thing, getThingHandlerFactory(thing));
         } else {
-            logger.debug("Handler for thing '{}' already exists.", thing.getUID());
-            handlerAdded(thing, thingHandler);
+            logger.debug("Handler of tracked thing '{}' already registered.", thing.getUID());
         }
     }
 
     @Override
     public void thingRemoving(Thing thing, ThingTrackerEvent thingTrackerEvent) {
-        thingHandlerCallback.statusUpdated(thing, ThingStatusInfoBuilder.create(ThingStatus.REMOVING).build());
+        setThingStatus(thing, ThingStatusInfoBuilder.create(ThingStatus.REMOVING).build());
+        notifyThingHandlerAboutRemoval(thing);
     }
 
     @Override
     public void thingRemoved(final Thing thing, ThingTrackerEvent thingTrackerEvent) {
-        ThingUID thingId = thing.getUID();
-        ThingHandler thingHandler = thingHandlers.get(thingId);
+        logger.debug("Thing '{}' is no longer tracked by ThingManager.", thing.getUID());
+
+        ThingHandler thingHandler = thingHandlers.get(thing.getUID());
         if (thingHandler != null) {
             final ThingHandlerFactory thingHandlerFactory = findThingHandlerFactory(thing.getThingTypeUID());
             if (thingHandlerFactory != null) {
                 unregisterHandler(thing, thingHandlerFactory);
+                disposeHandler(thing, thingHandler);
                 if (thingTrackerEvent == ThingTrackerEvent.THING_REMOVED) {
                     SafeMethodCaller.call(new SafeMethodCaller.Action<Void>() {
                         @Override
@@ -511,7 +492,6 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
             }
         }
 
-        logger.debug("Thing '{}' is no longer tracked by ThingManager.", thing.getUID());
         this.things.remove(thing);
     }
 
@@ -531,7 +511,7 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
             if (oldThing != thing) {
                 thing.setHandler(thingHandler);
             }
-            if (isInitialized(thing)) {
+            if (ThingHandlerHelper.isHandlerInitialized(thing)) {
                 try {
                     // prevent infinite loops by not informing handler about self-initiated update
                     if (!thingUpdatedLock.contains(thingUID)) {
@@ -545,15 +525,17 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                         });
                     }
                 } catch (Exception ex) {
-                    logger.error("Exception occured while calling thing updated at ThingHandler '" + thingHandler + ": "
-                            + ex.getMessage(), ex);
+                    logger.error("Exception occured while calling thing updated at ThingHandler '{}': {}", thingHandler,
+                            ex.getMessage(), ex);
                 }
             } else {
-                logger.debug("Cannot notify handler about updated thing {}, because thing is not initialized "
-                        + "(must be in status ONLINE or OFFLINE).", thing.getThingTypeUID());
+                logger.debug(
+                        "Cannot notify handler about updated thing '{}', because handler is not initialized (thing must be in status UNKNOWN, ONLINE or OFFLINE). Starting handler initialization instead.",
+                        thing.getThingTypeUID());
+                initializeHandler(thing);
             }
         } else {
-            registerHandler(thing);
+            registerAndInitializeHandler(thing, getThingHandlerFactory(thing));
         }
 
         if (oldThing != thing) {
@@ -561,23 +543,17 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
         }
     }
 
-    private void registerHandler(Thing thing) {
-        ThingUID thingUID = thing.getUID();
-
-        // this check is needed to prevent infinite loops while a handler is initialized
-        if (!registerHandlerLock.contains(thingUID)) {
-            registerHandlerLock.add(thingUID);
-            ThingHandlerFactory thingHandlerFactory = findThingHandlerFactory(thing.getThingTypeUID());
-            if (thingHandlerFactory != null) {
-                registerHandler(thing, thingHandlerFactory);
-            } else {
-                logger.debug("Not registering a handler at this point since no handler factory for thing '{}' found.",
-                        thingUID);
+    private Thing getThing(ThingUID id) {
+        for (Thing thing : this.things) {
+            if (thing.getUID().equals(id)) {
+                return thing;
             }
-            registerHandlerLock.remove(thingUID);
-        } else {
-            logger.warn("Attempt to register a handler twice for thing {} at the same time will be ignored.", thingUID);
         }
+        return null;
+    }
+
+    private ThingType getThingType(Thing thing) {
+        return thingTypeRegistry.getThingType(thing.getThingTypeUID());
     }
 
     private ThingHandlerFactory findThingHandlerFactory(ThingTypeUID thingTypeUID) {
@@ -589,56 +565,103 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
         return null;
     }
 
-    private Thing getThing(ThingUID id) {
-        for (Thing thing : this.things) {
-            if (thing.getUID().equals(id)) {
-                return thing;
+    private void registerHandler(Thing thing, ThingHandlerFactory thingHandlerFactory) {
+        synchronized (thing) {
+            if (!isHandlerRegistered(thing)) {
+                if (!hasBridge(thing)) {
+                    doRegisterHandler(thing, thingHandlerFactory);
+                } else {
+                    Bridge bridge = getBridge(thing.getBridgeUID());
+                    if (bridge != null && ThingHandlerHelper.isHandlerInitialized(bridge)) {
+                        doRegisterHandler(thing, thingHandlerFactory);
+                    } else {
+                        setThingStatus(thing,
+                                buildStatusInfo(ThingStatus.UNINITIALIZED, ThingStatusDetail.HANDLER_MISSING_ERROR));
+                    }
+                }
+            } else {
+                logger.debug("Attempt to register a handler twice for thing {} at the same time will be ignored.",
+                        thing.getUID());
             }
         }
-
-        return null;
     }
 
-    private void registerHandler(final Thing thing, final ThingHandlerFactory thingHandlerFactory) {
-        logger.debug("Calling registerHandler handler for thing '{}' at '{}'.", thing.getUID(), thingHandlerFactory);
+    private void doRegisterHandler(final Thing thing, final ThingHandlerFactory thingHandlerFactory) {
+        logger.debug("Calling '{}.registerHandler()' for thing '{}'.", thingHandlerFactory.getClass().getSimpleName(),
+                thing.getUID());
         try {
-            SafeMethodCaller.call(new SafeMethodCaller.ActionWithException<Void>() {
-
-                @Override
-                public Void call() throws Exception {
-                    thingHandlerFactory.registerHandler(thing, ThingManager.this.thingHandlerCallback);
-                    return null;
-                }
-            });
-        } catch (TimeoutException ex) {
-            logger.warn("Registering handler for thing '{}' takes more than {}ms.", thing.getUID(),
-                    SafeMethodCaller.DEFAULT_TIMEOUT);
+            ThingHandler thingHandler = thingHandlerFactory.registerHandler(thing);
+            thingHandler.setCallback(ThingManager.this.thingHandlerCallback);
+            thing.setHandler(thingHandler);
+            thingHandlers.put(thing.getUID(), thingHandler);
+            thingHandlersByFactory.put(thingHandlerFactory, thingHandler);
         } catch (Exception ex) {
             ThingStatusInfo statusInfo = buildStatusInfo(ThingStatus.UNINITIALIZED,
                     ThingStatusDetail.HANDLER_REGISTERING_ERROR,
                     ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
             setThingStatus(thing, statusInfo);
-            logger.error("Exception occured while calling thing handler factory '" + thingHandlerFactory + "': "
-                    + ex.getMessage(), ex);
+            logger.error("Exception occured while calling thing handler factory '{}': {}", thingHandlerFactory,
+                    ex.getMessage(), ex);
         }
     }
 
-    private void initializeHandler(final Thing thing) {
-        ThingType thingType = thingTypeRegistry.getThingType(thing.getThingTypeUID());
+    private void registerChildHandlers(final Bridge bridge) {
+        for (final Thing child : bridge.getThings()) {
+            logger.debug("Register and initialize child '{}' of bridge '{}'.", child.getUID(), bridge.getUID());
+            ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        registerAndInitializeHandler(child, getThingHandlerFactory(child));
+                    } catch (Exception ex) {
+                        logger.error(
+                                "Registration resp. initialization of child '{}' of bridge '{}' has been failed: {}",
+                                child.getUID(), bridge.getUID(), ex.getMessage(), ex);
+                    }
+                }
+            });
+        }
+    }
+
+    private void initializeHandler(Thing thing) {
+        if (!isHandlerRegistered(thing)) {
+            return;
+        }
+        initializationVetoManager.applyActionFor(thing.getHandler());
+    }
+
+    private final BundleProcessorVetoManager<ThingHandler> initializationVetoManager = new BundleProcessorVetoManager<>(
+            new BundleProcessorVetoManager.Action<ThingHandler>() {
+                @Override
+                public void apply(ThingHandler thingHandler) {
+                    Thing thing = thingHandler.getThing();
+                    synchronized (thing) {
+                        if (!isInitializing(thing)) {
+                            ThingType thingType = getThingType(thing);
+                            applyDefaultConfiguration(thing, thingType);
+                            if (isInitializable(thing, thingType)) {
+                                setThingStatus(thing,
+                                        buildStatusInfo(ThingStatus.INITIALIZING, ThingStatusDetail.NONE));
+                                doInitializeHandler(thingHandler);
+                            } else {
+                                logger.debug("Thing '{}' not initializable, check required configuration parameters.",
+                                        thing.getUID());
+                                setThingStatus(thing, buildStatusInfo(ThingStatus.UNINITIALIZED,
+                                        ThingStatusDetail.HANDLER_CONFIGURATION_PENDING));
+                            }
+                        } else {
+                            logger.debug(
+                                    "Attempt to initialize a handler twice for thing '{}' at the same time will be ignored.",
+                                    thing.getUID());
+                        }
+                    }
+                }
+            });
+
+    private void applyDefaultConfiguration(Thing thing, ThingType thingType) {
         if (thingType != null) {
             ThingFactoryHelper.applyDefaultConfiguration(thing.getConfiguration(), thingType,
                     configDescriptionRegistry);
-        }
-
-        if (isInitializable(thing, thingType)) {
-            ThingStatusInfo statusInfo = buildStatusInfo(ThingStatus.INITIALIZING, ThingStatusDetail.NONE);
-            setThingStatus(thing, statusInfo);
-            initializeHandler(thing.getHandler());
-        } else {
-            logger.debug("Thing '{}' not initializable, check required configuration parameters.", thing.getUID());
-            ThingStatusInfo statusInfo = buildStatusInfo(ThingStatus.UNINITIALIZED,
-                    ThingStatusDetail.HANDLER_CONFIGURATION_PENDING);
-            setThingStatus(thing, statusInfo);
         }
     }
 
@@ -677,27 +700,7 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
         return requiredParameters;
     }
 
-    private void initializeHandler(final ThingHandler thingHandler) {
-        Bundle bundle = null;
-        for (BundleProcessor proc : bundleProcessors) {
-            Bundle b = proc.isFinishedLoading(thingHandler);
-            if (b != null) {
-                bundle = b;
-                logger.trace("Marking '{}' vetoed by '{}'", b.getSymbolicName(), proc);
-                initializerVetoes.put(bundle, proc);
-                if (!initializerQueue.containsEntry(bundle, thingHandler)) {
-                    logger.trace("Queueing '{}' in bundle '{}'", thingHandler, b.getSymbolicName());
-                    initializerQueue.put(b.getSymbolicName(), thingHandler);
-                }
-            }
-        }
-        if (bundle != null) {
-            logger.debug(
-                    "Meta-data of bundle '{}' is not fully loaded ({}), deferring handler initialization for thing '{}'",
-                    bundle.getSymbolicName(), initializerVetoes.get(bundle), thingHandler.getThing().getUID());
-            return;
-        }
-        logger.debug("All data has been loaded, going to initialize '{}'.", thingHandler.getThing().getUID());
+    private void doInitializeHandler(final ThingHandler thingHandler) {
         scheduler.schedule(new Runnable() {
             @Override
             public void run() {
@@ -719,85 +722,82 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                             ThingStatusDetail.HANDLER_INITIALIZING_ERROR,
                             ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
                     setThingStatus(thingHandler.getThing(), statusInfo);
-                    logger.error("Exception occured while initializing handler of thing '"
-                            + thingHandler.getThing().getUID() + "': " + ex.getMessage(), ex);
+                    logger.error("Exception occured while initializing handler of thing '{}': {}",
+                            thingHandler.getThing().getUID(), ex.getMessage(), ex);
                 }
             }
         }, 0, TimeUnit.NANOSECONDS);
     }
 
-    @Override
-    public void bundleFinished(BundleProcessor context, Bundle bundle) {
-        logger.debug("'{}' finished loading meta-data of bundle '{}'", context, bundle.getSymbolicName());
-        initializerVetoes.remove(bundle, context);
-        logger.trace("'{}' still vetoed by '{}'", bundle.getSymbolicName(), initializerVetoes.get(bundle));
-        logger.trace("'{}' queued '{}'", bundle.getSymbolicName(), initializerQueue.get(bundle.getSymbolicName()));
-        if (initializerVetoes.get(bundle).isEmpty()) {
-            synchronized (initializerQueue) {
-                for (ThingHandler thingHandler : initializerQueue.removeAll(bundle.getSymbolicName())) {
-                    logger.trace("Going to initialize '{}'", thingHandler.getThing().getUID());
-                    initializeHandler(thingHandler);
+    private boolean isInitializing(Thing thing) {
+        return thing.getStatus() == ThingStatus.INITIALIZING;
+    }
+
+    private boolean isHandlerRegistered(Thing thing) {
+        ThingHandler handler = thingHandlers.get(thing.getUID());
+        return handler != null && handler == thing.getHandler();
+    }
+
+    private boolean isBridge(Thing thing) {
+        return thing instanceof Bridge;
+    }
+
+    private boolean hasBridge(final Thing thing) {
+        return thing.getBridgeUID() != null;
+    }
+
+    private Bridge getBridge(ThingUID bridgeUID) {
+        Thing bridge = thingRegistry.get(bridgeUID);
+        return isBridge(bridge) ? (Bridge) bridge : null;
+    }
+
+    private void unregisterHandler(Thing thing, ThingHandlerFactory thingHandlerFactory) {
+        synchronized (thing) {
+            if (isHandlerRegistered(thing)) {
+                if (!isBridge(thing)) {
+                    doUnregisterHandler(thing, thingHandlerFactory);
+                } else {
+                    unregisterChildHandlers((Bridge) thing, thingHandlerFactory);
+                    doUnregisterHandler(thing, thingHandlerFactory);
                 }
             }
         }
     }
 
-    private boolean isInitialized(Thing thing) {
-        return thing.getStatus() == ThingStatus.ONLINE || thing.getStatus() == ThingStatus.OFFLINE;
-    }
-
-    private void notifyThingsAboutBridgeInitialization(Bridge bridge) {
-        for (Thing child : bridge.getThings()) {
-            notifyThingAboutBridgeInitialization(bridge, child);
-        }
-    }
-
-    private void notifyThingAboutBridgeInitialization(Thing thing) {
-        if (thing.getBridgeUID() != null) {
-            Thing bridge = thingRegistry.get(thing.getBridgeUID());
-            if (bridge instanceof Bridge) {
-                notifyThingAboutBridgeInitialization((Bridge) bridge, thing);
-            }
-        }
-    }
-
-    private void notifyThingAboutBridgeInitialization(final Bridge bridge, final Thing childThing) {
-        if (childThing.getHandler() == null) {
-            return;
-        }
-
-        ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    childThing.getHandler().bridgeHandlerInitialized(bridge.getHandler(), bridge);
-                } catch (Exception ex) {
-                    logger.error("Exception occured during notification of thing '" + childThing.getUID()
-                            + "' about bridge initialization at '" + childThing.getHandler() + "': " + ex.getMessage(),
-                            ex);
-                }
-            }
-        });
-    }
-
-    private void unregisterHandler(final Thing thing, final ThingHandlerFactory thingHandlerFactory) {
+    private void doUnregisterHandler(final Thing thing, final ThingHandlerFactory thingHandlerFactory) {
         logger.debug("Calling unregisterHandler handler for thing '{}' at '{}'.", thing.getUID(), thingHandlerFactory);
         try {
             SafeMethodCaller.call(new SafeMethodCaller.ActionWithException<Void>() {
                 @Override
                 public Void call() throws Exception {
+                    ThingHandler thingHandler = thing.getHandler();
                     thingHandlerFactory.unregisterHandler(thing);
+                    thingHandler.setCallback(null);
+                    thing.setHandler(null);
+                    setThingStatus(thing,
+                            buildStatusInfo(ThingStatus.UNINITIALIZED, ThingStatusDetail.HANDLER_MISSING_ERROR));
+                    thingHandlers.remove(thing.getUID());
+                    thingHandlersByFactory.remove(thingHandlerFactory, thingHandler);
                     return null;
                 }
             });
         } catch (Exception ex) {
-            logger.error("Exception occured while calling thing handler factory '" + thingHandlerFactory + "': "
-                    + ex.getMessage(), ex);
+            logger.error("Exception occured while calling thing handler factory '{}' ", thingHandlerFactory,
+                    ex.getMessage(), ex);
         }
     }
 
-    private void disposeHandler(final Thing thing, final ThingHandler thingHandler) {
-        logger.debug("Calling dispose handler for thing '{}' at '{}'.", thing.getUID(), thingHandler);
+    private void disposeHandler(Thing thing, ThingHandler thingHandler) {
+        synchronized (thing) {
+            doDisposeHandler(thingHandler);
+            if (hasBridge(thing)) {
+                notifyBridgeAboutChildHandlerDisposal(thing, thingHandler);
+            }
+        }
+    }
+
+    private void doDisposeHandler(final ThingHandler thingHandler) {
+        logger.debug("Calling dispose handler for thing '{}' at '{}'.", thingHandler.getThing().getUID(), thingHandler);
         try {
             SafeMethodCaller.call(new SafeMethodCaller.ActionWithException<Void>() {
                 @Override
@@ -807,85 +807,53 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
                 }
             });
         } catch (TimeoutException ex) {
-            logger.warn("Disposing handler for thing '{}' takes more than {}ms.", thing.getUID(),
+            logger.warn("Disposing handler for thing '{}' takes more than {}ms.", thingHandler.getThing().getUID(),
                     SafeMethodCaller.DEFAULT_TIMEOUT);
-        } catch (Exception ex) {
-            logger.error(
-                    "Exception occured while disposing handler of thing '" + thing.getUID() + "': " + ex.getMessage(),
-                    ex);
+        } catch (Exception e) {
+            logger.error("Exception occured while disposing handler of thing '{}': {}",
+                    thingHandler.getThing().getUID(), e.getMessage(), e);
         }
     }
 
-    private void notifyThingsAboutBridgeDisposal(final Bridge bridge) {
-        // notify all child-thing-handlers about bridge disposal
-        for (Thing childThing : bridge.getThings()) {
-            notifyThingAboutBridgeDisposal(bridge, childThing);
+    private void unregisterChildHandlers(Bridge bridge, ThingHandlerFactory thingHandlerFactory) {
+        addThingsToBridge(bridge);
+        for (Thing child : bridge.getThings()) {
+            ThingHandler handler = child.getHandler();
+            if (handler != null) {
+                logger.debug("Unregister and dispose child '{}' of bridge '{}'.", child.getUID(), bridge.getUID());
+                unregisterHandler(child, thingHandlerFactory);
+                disposeHandler(child, handler);
+            }
         }
     }
 
-    private void notifyThingAboutBridgeDisposal(final Bridge bridge, final Thing childThing) {
-        if (childThing.getHandler() == null) {
-            return;
-        }
-
-        ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    childThing.getHandler().bridgeHandlerDisposed(bridge.getHandler(), bridge);
-                } catch (Exception ex) {
-                    logger.error("Exception occured during notification of thing '" + childThing.getUID()
-                            + "' about bridge disposal at '" + childThing.getHandler() + "': " + ex.getMessage(), ex);
+    private void addThingsToBridge(Bridge bridge) {
+        Collection<Thing> things = thingRegistry.getAll();
+        for (Thing thing : things) {
+            ThingUID bridgeUID = thing.getBridgeUID();
+            if (bridgeUID != null && bridgeUID.equals(bridge.getUID())) {
+                if (bridge instanceof BridgeImpl && !bridge.getThings().contains(thing)) {
+                    ((BridgeImpl) bridge).addThing(thing);
                 }
             }
-        });
-    }
-
-    private void updateThingStatus(final ThingStatusInfo thingStatus, final Bridge bridge) {
-        for (final Thing bridgeChildThing : bridge.getThings()) {
-            final ThingStatusInfo bridgeChildThingStatus = bridgeChildThing.getStatusInfo();
-            if (bridgeChildThingStatus.getStatus() == ThingStatus.ONLINE
-                    || bridgeChildThingStatus.getStatus() == ThingStatus.OFFLINE) {
-
-                ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            if (thingStatus.getStatus() == ThingStatus.ONLINE
-                                    && bridgeChildThingStatus.getStatusDetail() == ThingStatusDetail.BRIDGE_OFFLINE) {
-                                ThingStatusInfo statusInfo = ThingStatusInfoBuilder
-                                        .create(ThingStatus.OFFLINE, ThingStatusDetail.NONE).build();
-                                setThingStatus(bridgeChildThing, statusInfo);
-                            } else if (thingStatus.getStatus() == ThingStatus.OFFLINE) {
-                                ThingStatusInfo statusInfo = ThingStatusInfoBuilder
-                                        .create(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE).build();
-                                setThingStatus(bridgeChildThing, statusInfo);
-                            }
-                        } catch (Exception ex) {
-                            logger.error("Exception occured during status update of thing '" + bridgeChildThing.getUID()
-                                    + "': " + ex.getMessage(), ex);
-                        }
-                    }
-                });
-            }
         }
     }
 
-    private void notifyThingsAboutBridgeStatusChange(final ThingStatusInfo bridgeStatus, final Bridge bridge) {
-        if (bridgeStatus.getStatus() == ThingStatus.ONLINE || bridgeStatus.getStatus() == ThingStatus.OFFLINE) {
-
-            for (final Thing bridgeChildThing : bridge.getThings()) {
+    private void notifyThingsAboutBridgeStatusChange(final Bridge bridge, final ThingStatusInfo bridgeStatus) {
+        if (ThingHandlerHelper.isHandlerInitialized(bridge)) {
+            for (final Thing child : bridge.getThings()) {
                 ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
-                            ThingHandler handler = bridgeChildThing.getHandler();
-                            if (handler != null) {
+                            ThingHandler handler = child.getHandler();
+                            if (handler != null && ThingHandlerHelper.isHandlerInitialized(child)) {
                                 handler.bridgeStatusChanged(bridgeStatus);
                             }
-                        } catch (Exception ex) {
-                            logger.error("Exception occured during notification about bridge status change on thing '"
-                                    + bridgeChildThing.getUID() + "': " + ex.getMessage(), ex);
+                        } catch (Exception e) {
+                            logger.error(
+                                    "Exception occured during notification about bridge status change on thing '{}': {}",
+                                    child.getUID(), e.getMessage(), e);
                         }
                     }
                 });
@@ -893,7 +861,49 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
         }
     }
 
-    private void notifyThingAboutRemoval(final Thing thing) {
+    private void notifyBridgeAboutChildHandlerInitialization(final Thing thing) {
+        final Bridge bridge = getBridge(thing.getBridgeUID());
+        if (bridge != null) {
+            ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        BridgeHandler bridgeHandler = bridge.getHandler();
+                        if (bridgeHandler != null) {
+                            bridgeHandler.childHandlerInitialized(thing.getHandler(), thing);
+                        }
+                    } catch (Exception e) {
+                        logger.error(
+                                "Exception occured during bridge handler ('{}') notification about handler initialization of child '{}': {}",
+                                bridge.getUID(), thing.getUID(), e.getMessage(), e);
+                    }
+                }
+            });
+        }
+    }
+
+    private void notifyBridgeAboutChildHandlerDisposal(final Thing thing, final ThingHandler thingHandler) {
+        final Bridge bridge = getBridge(thing.getBridgeUID());
+        if (bridge != null) {
+            ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        BridgeHandler bridgeHandler = bridge.getHandler();
+                        if (bridgeHandler != null) {
+                            bridgeHandler.childHandlerDisposed(thingHandler, thing);
+                        }
+                    } catch (Exception ex) {
+                        logger.error(
+                                "Exception occured during bridge handler ('{}') notification about handler disposal of child '{}': {}",
+                                bridge.getUID(), thing.getUID(), ex.getMessage(), ex);
+                    }
+                }
+            });
+        }
+    }
+
+    private void notifyThingHandlerAboutRemoval(final Thing thing) {
         logger.trace("Asking handler of thing '{}' to handle its removal.", thing.getUID());
 
         ThreadPoolManager.getPool(THING_MANAGER_THREADPOOL_NAME).execute(new Runnable() {
@@ -944,9 +954,6 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
     protected void activate(ComponentContext componentContext) {
         this.thingRegistry.addThingTracker(this);
-        this.bundleContext = componentContext.getBundleContext();
-        this.thingHandlerTracker = new ThingHandlerTracker(this.bundleContext);
-        this.thingHandlerTracker.open();
     }
 
     protected void addThingHandlerFactory(ThingHandlerFactory thingHandlerFactory) {
@@ -954,28 +961,71 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
         thingHandlerFactories.add(thingHandlerFactory);
 
-        for (Thing thing : this.things) {
+        for (Thing thing : things) {
             if (thingHandlerFactory.supportsThingType(thing.getThingTypeUID())) {
-                ThingUID thingId = thing.getUID();
-
-                ThingHandler thingHandler = thingHandlers.get(thingId);
-                if (thingHandler == null) {
-                    registerHandler(thing, thingHandlerFactory);
+                if (!isHandlerRegistered(thing)) {
+                    registerAndInitializeHandler(thing, thingHandlerFactory);
                 } else {
-                    logger.warn("Thing handler for thing '{}' already exists.", thingId);
+                    logger.debug("Thing handler for thing '{}' already registered", thing.getUID());
                 }
             }
         }
     }
 
+    private void registerAndInitializeHandler(final Thing thing, final ThingHandlerFactory thingHandlerFactory) {
+        if (thingHandlerFactory != null) {
+            try {
+                SafeMethodCaller.call(new SafeMethodCaller.ActionWithException<Void>() {
+                    @Override
+                    public Void call() throws Exception {
+                        registerHandler(thing, thingHandlerFactory);
+                        initializeHandler(thing);
+                        return null;
+                    }
+                });
+            } catch (TimeoutException e) {
+                logger.warn("Registering a handler for thing '{}' takes more than {}ms.", thing.getUID(),
+                        SafeMethodCaller.DEFAULT_TIMEOUT);
+            } catch (Exception ex) {
+                ThingStatusInfo statusInfo = buildStatusInfo(ThingStatus.UNINITIALIZED,
+                        ThingStatusDetail.HANDLER_REGISTERING_ERROR,
+                        ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
+                setThingStatus(thing, statusInfo);
+                logger.error("Exception occured while registering the handler for thing '{}' using factory '{}': {}",
+                        thing.getUID(), thingHandlerFactory, ex.getMessage(), ex);
+            }
+        } else {
+            logger.debug("Not registering a handler at this point since no handler factory for thing '{}' found.",
+                    thing.getUID());
+        }
+    }
+
+    private ThingHandlerFactory getThingHandlerFactory(Thing thing) {
+        ThingHandlerFactory thingHandlerFactory = findThingHandlerFactory(thing.getThingTypeUID());
+        if (thingHandlerFactory != null) {
+            return thingHandlerFactory;
+        }
+        logger.debug("Not registering a handler at this point since no handler factory for thing '{}' found.",
+                thing.getUID());
+        return null;
+    }
+
     protected void deactivate(ComponentContext componentContext) {
         this.thingRegistry.removeThingTracker(this);
-        this.thingHandlerTracker.close();
     }
 
     protected void removeThingHandlerFactory(ThingHandlerFactory thingHandlerFactory) {
         logger.debug("Thing handler factory '{}' removed", thingHandlerFactory.getClass().getSimpleName());
 
+        Set<ThingHandler> handlers = ImmutableSet.copyOf(thingHandlersByFactory.get(thingHandlerFactory));
+        for (ThingHandler thingHandler : handlers) {
+            Thing thing = thingHandler.getThing();
+            if (thing != null && isHandlerRegistered(thing)) {
+                unregisterHandler(thing, thingHandlerFactory);
+                disposeHandler(thing, thingHandler);
+            }
+        }
+        thingHandlersByFactory.removeAll(thingHandlerFactory);
         thingHandlerFactories.remove(thingHandlerFactory);
     }
 
@@ -1001,14 +1051,6 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
 
     protected void unsetThingRegistry(ThingRegistry thingRegistry) {
         this.thingRegistry = null;
-    }
-
-    protected void setManagedThingProvider(ManagedThingProvider managedThingProvider) {
-        this.managedThingProvider = managedThingProvider;
-    }
-
-    protected void unsetManagedThingProvider(ManagedThingProvider managedThingProvider) {
-        this.managedThingProvider = null;
     }
 
     protected void setConfigDescriptionRegistry(ConfigDescriptionRegistry configDescriptionRegistry) {
@@ -1053,13 +1095,11 @@ public class ThingManager extends AbstractItemEventSubscriber implements ThingTr
     }
 
     protected void setBundleProcessor(BundleProcessor bundleProcessor) {
-        bundleProcessors.add(bundleProcessor);
-        bundleProcessor.registerListener(this);
+        initializationVetoManager.addBundleProcessor(bundleProcessor);
     }
 
     protected void unsetBundleProcessor(BundleProcessor bundleProcessor) {
-        bundleProcessor.unregisterListener(this);
-        bundleProcessors.remove(bundleProcessor);
+        initializationVetoManager.removeBundleProcessor(bundleProcessor);
     }
 
 }

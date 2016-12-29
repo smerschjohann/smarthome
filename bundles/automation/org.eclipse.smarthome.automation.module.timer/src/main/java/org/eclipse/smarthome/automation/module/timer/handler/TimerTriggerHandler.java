@@ -10,9 +10,8 @@ package org.eclipse.smarthome.automation.module.timer.handler;
 import java.util.UUID;
 
 import org.eclipse.smarthome.automation.Trigger;
-import org.eclipse.smarthome.automation.handler.BaseModuleHandler;
+import org.eclipse.smarthome.automation.handler.BaseTriggerModuleHandler;
 import org.eclipse.smarthome.automation.handler.RuleEngineCallback;
-import org.eclipse.smarthome.automation.handler.TriggerHandler;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -32,11 +31,10 @@ import org.slf4j.LoggerFactory;
  * @author Christoph Knauf - Initial Contribution
  *
  */
-public class TimerTriggerHandler extends BaseModuleHandler<Trigger>implements TriggerHandler {
+public class TimerTriggerHandler extends BaseTriggerModuleHandler {
 
     private final Logger logger = LoggerFactory.getLogger(TimerTriggerHandler.class);
 
-    private RuleEngineCallback callback;
     private JobDetail job;
     private CronTrigger trigger;
     private Scheduler scheduler;
@@ -55,11 +53,15 @@ public class TimerTriggerHandler extends BaseModuleHandler<Trigger>implements Tr
     }
 
     @Override
-    public void setRuleEngineCallback(RuleEngineCallback ruleCallback) {
-        this.callback = ruleCallback;
+    public synchronized void setRuleEngineCallback(RuleEngineCallback ruleCallback) {
+        super.setRuleEngineCallback(ruleCallback);
+        initalizeTimer();
+    }
+
+    private void initalizeTimer() {
         this.job = JobBuilder.newJob(CallbackJob.class).withIdentity(MODULE_TYPE_ID + UUID.randomUUID().toString())
                 .build();
-        this.job.getJobDataMap().put(CALLBACK_CONTEXT_NAME, this.callback);
+        this.job.getJobDataMap().put(CALLBACK_CONTEXT_NAME, this.ruleEngineCallback);
         this.job.getJobDataMap().put(MODULE_CONTEXT_NAME, this.module);
         try {
             this.scheduler = new StdSchedulerFactory().getScheduler();
@@ -71,10 +73,11 @@ public class TimerTriggerHandler extends BaseModuleHandler<Trigger>implements Tr
     }
 
     @Override
-    public void dispose() {
+    public synchronized void dispose() {
+        super.dispose();
         try {
-            if (scheduler != null && job != null) {
-                scheduler.deleteJob(job.getKey());
+            if (scheduler != null) {
+                scheduler.clear();
             }
             scheduler = null;
             trigger = null;
@@ -82,6 +85,5 @@ public class TimerTriggerHandler extends BaseModuleHandler<Trigger>implements Tr
         } catch (SchedulerException e) {
             logger.error("Error while disposing Job: {}", e.getMessage());
         }
-
     }
 }

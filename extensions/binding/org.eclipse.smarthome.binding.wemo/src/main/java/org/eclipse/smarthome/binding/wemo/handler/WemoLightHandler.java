@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,9 +9,10 @@ package org.eclipse.smarthome.binding.wemo.handler;
 
 import static org.eclipse.smarthome.binding.wemo.WemoBindingConstants.*;
 
+import java.math.BigDecimal;
 import java.net.URL;
-import java.util.Collections;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -26,11 +27,12 @@ import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingStatus;
+import org.eclipse.smarthome.core.thing.ThingStatusDetail;
 import org.eclipse.smarthome.core.thing.ThingStatusInfo;
-import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.types.Command;
+import org.eclipse.smarthome.core.types.RefreshType;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.io.transport.upnp.UpnpIOParticipant;
 import org.eclipse.smarthome.io.transport.upnp.UpnpIOService;
@@ -47,6 +49,8 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
 
     private final Logger logger = LoggerFactory.getLogger(WemoLightHandler.class);
 
+    private Map<String, Boolean> subscriptionState = new HashMap<String, Boolean>();
+
     private UpnpIOService service;
 
     private WemoBridgeHandler wemoBridgeHandler;
@@ -62,12 +66,15 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
 
     protected final static int SUBSCRIPTION_DURATION = 600;
 
-    public final static Set<ThingTypeUID> SUPPORTED_THING_TYPES = Collections.singleton(THING_TYPE_MZ100);
-
     /**
      * The default refresh interval in Seconds.
      */
     private int DEFAULT_REFRESH_INTERVAL = 60;
+    
+    /**
+     * The default refresh initial delay in Seconds.
+     */
+    private static int DEFAULT_REFRESH_INITIAL_DELAY = 15;
 
     private ScheduledFuture<?> refreshJob;
 
@@ -76,7 +83,13 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
         @Override
         public void run() {
             try {
+                if (!isUpnpDeviceRegistered()) {
+                    logger.debug("WeMo UPnP device {} not yet registered", getUDN());
+                }
+
                 getDeviceState();
+                onSubscription();
+
             } catch (Exception e) {
                 logger.debug("Exception during poll : {}", e);
             }
@@ -96,45 +109,20 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
 
     @Override
     public void initialize() {
+        // initialize() is only called if the required parameter 'deviceID' is available
+        wemoLightID = (String) getConfig().get(DEVICE_ID);
 
-        logger.debug("Initializing WemoLightHandler");
-
-        final String configLightId = (String) getConfig().get(DEVICE_ID);
-
-        if (DEVICE_ID != null) {
-            wemoLightID = configLightId;
+        if (getBridge() != null) {
             logger.debug("Initializing WemoLightHandler for LightID '{}'", wemoLightID);
-            WemoBridgeHandler handler = getWemoBridgeHandler();
-            if (handler != null) {
+            if (getBridge().getStatus() == ThingStatus.ONLINE) {
                 updateStatus(ThingStatus.ONLINE);
-            } else {
-                updateStatus(ThingStatus.OFFLINE);
-                logger.debug("No WemoBridgeHandler found for LightID '{}'", wemoLightID);
-            }
-
-        }
-    }
-
-    @Override
-    public void bridgeHandlerInitialized(ThingHandler thingHandler, Bridge bridge) {
-        if (thingHandler instanceof WemoBridgeHandler) {
-            this.wemoBridgeHandler = (WemoBridgeHandler) thingHandler;
-            updateStatus(ThingStatus.ONLINE);
-            logger.debug("bridgeHandlerInitialized for WeMo LED {}", wemoLightID);
-            if (SUPPORTED_THING_TYPES.contains(this.getThing().getThingTypeUID())) {
-                logger.debug("Initialize Thing {}", this.getThing().getThingTypeUID());
                 onSubscription();
                 onUpdate();
+            } else {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.OFFLINE.BRIDGE_OFFLINE);
             }
-        }
-    }
-
-    @Override
-    public void bridgeHandlerDisposed(ThingHandler thingHandler, Bridge bridge) {
-        this.wemoBridgeHandler = null;
-        if (refreshJob != null && !refreshJob.isCancelled()) {
-            refreshJob.cancel(true);
-            refreshJob = null;
+        } else {
+            updateStatus(ThingStatus.OFFLINE);
         }
     }
 
@@ -145,7 +133,7 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
             onSubscription();
             onUpdate();
         } else {
-            updateStatus(ThingStatus.OFFLINE);
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.OFFLINE.BRIDGE_OFFLINE);
             if (refreshJob != null && !refreshJob.isCancelled()) {
                 refreshJob.cancel(true);
                 refreshJob = null;
@@ -187,100 +175,110 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
 
-        Configuration configuration = getConfig();
-        configuration.get(DEVICE_ID);
+        if (command instanceof RefreshType) {
+            try {
+                getDeviceState();
+            } catch (Exception e) {
+                logger.debug("Exception during poll : {}", e);
+            }
+        } else {
 
-        WemoBridgeHandler wemoBridge = getWemoBridgeHandler();
-        if (wemoBridge == null) {
-            logger.debug("wemoBridgeHandler not found, cannot handle command");
-            return;
-        }
-        String devUDN = "uuid:" + wemoBridge.getThing().getConfiguration().get(UDN).toString();
-        logger.trace("WeMo Bridge to send command to : {}", devUDN);
+            Configuration configuration = getConfig();
+            configuration.get(DEVICE_ID);
 
-        String value = null;
-        String capability = null;
-        switch (channelUID.getId()) {
-            case CHANNEL_BRIGHTNESS:
-                capability = "10008";
-                if (command instanceof PercentType) {
-                    int newBrightness = ((PercentType) command).intValue();
-                    logger.trace("wemoLight received Value {}", newBrightness);
-                    int value1 = Math.round(newBrightness * 255 / 100);
-                    value = value1 + ":0";
-                    currentBrightness = newBrightness;
-                } else if (command instanceof OnOffType) {
+            WemoBridgeHandler wemoBridge = getWemoBridgeHandler();
+            if (wemoBridge == null) {
+                logger.debug("wemoBridgeHandler not found, cannot handle command");
+                return;
+            }
+            String devUDN = "uuid:" + wemoBridge.getThing().getConfiguration().get(UDN).toString();
+            logger.trace("WeMo Bridge to send command to : {}", devUDN);
+
+            String value = null;
+            String capability = null;
+            switch (channelUID.getId()) {
+                case CHANNEL_BRIGHTNESS:
+                    capability = "10008";
+                    if (command instanceof PercentType) {
+                        int newBrightness = ((PercentType) command).intValue();
+                        logger.trace("wemoLight received Value {}", newBrightness);
+                        int value1 = Math.round(newBrightness * 255 / 100);
+                        value = value1 + ":0";
+                        currentBrightness = newBrightness;
+                    } else if (command instanceof OnOffType) {
+                        switch (command.toString()) {
+                            case "ON":
+                                value = "255:0";
+                                break;
+                            case "OFF":
+                                value = "0:0";
+                                break;
+                        }
+                    } else if (command instanceof IncreaseDecreaseType) {
+                        int newBrightness;
+                        switch (command.toString()) {
+                            case "INCREASE":
+                                currentBrightness = currentBrightness + DIM_STEPSIZE;
+                                newBrightness = Math.round(currentBrightness * 255 / 100);
+                                if (newBrightness > 255) {
+                                    newBrightness = 255;
+                                }
+                                value = newBrightness + ":0";
+                                break;
+                            case "DECREASE":
+                                currentBrightness = currentBrightness - DIM_STEPSIZE;
+                                newBrightness = Math.round(currentBrightness * 255 / 100);
+                                if (newBrightness < 0) {
+                                    newBrightness = 0;
+                                }
+                                value = newBrightness + ":0";
+                                break;
+                        }
+                    }
+                    break;
+                case CHANNEL_STATE:
+                    capability = "10006";
                     switch (command.toString()) {
                         case "ON":
-                            value = "255:0";
+                            value = "1";
                             break;
                         case "OFF":
-                            value = "0:0";
+                            value = "0";
                             break;
                     }
-                } else if (command instanceof IncreaseDecreaseType) {
-                    int newBrightness;
-                    switch (command.toString()) {
-                        case "INCREASE":
-                            currentBrightness = currentBrightness + DIM_STEPSIZE;
-                            newBrightness = Math.round(currentBrightness * 255 / 100);
-                            if (newBrightness > 255) {
-                                newBrightness = 255;
-                            }
-                            value = newBrightness + ":0";
-                            break;
-                        case "DECREASE":
-                            currentBrightness = currentBrightness - DIM_STEPSIZE;
-                            newBrightness = Math.round(currentBrightness * 255 / 100);
-                            if (newBrightness < 0) {
-                                newBrightness = 0;
-                            }
-                            value = newBrightness + ":0";
-                            break;
-                    }
-                }
-                break;
-            case CHANNEL_STATE:
-                capability = "10006";
-                switch (command.toString()) {
-                    case "ON":
-                        value = "1";
-                        break;
-                    case "OFF":
-                        value = "0";
-                        break;
-                }
-                break;
-        }
-        try {
-            String soapHeader = "\"urn:Belkin:service:bridge:1#SetDeviceStatus\"";
-            String content = "<?xml version=\"1.0\"?>"
-                    + "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
-                    + "<s:Body>" + "<u:SetDeviceStatus xmlns:u=\"urn:Belkin:service:bridge:1\">" + "<DeviceStatusList>"
-                    + "&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;DeviceStatus&gt;&lt;DeviceID&gt;"
-                    + wemoLightID + "&lt;/DeviceID&gt;&lt;IsGroupAction&gt;NO&lt;/IsGroupAction&gt;&lt;CapabilityID&gt;"
-                    + capability + "&lt;/CapabilityID&gt;&lt;CapabilityValue&gt;" + value
-                    + "&lt;/CapabilityValue&gt;&lt;/DeviceStatus&gt;" + "</DeviceStatusList>" + "</u:SetDeviceStatus>"
-                    + "</s:Body>" + "</s:Envelope>";
+                    break;
+            }
+            try {
+                String soapHeader = "\"urn:Belkin:service:bridge:1#SetDeviceStatus\"";
+                String content = "<?xml version=\"1.0\"?>"
+                        + "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                        + "<s:Body>" + "<u:SetDeviceStatus xmlns:u=\"urn:Belkin:service:bridge:1\">"
+                        + "<DeviceStatusList>"
+                        + "&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;&lt;DeviceStatus&gt;&lt;DeviceID&gt;"
+                        + wemoLightID
+                        + "&lt;/DeviceID&gt;&lt;IsGroupAction&gt;NO&lt;/IsGroupAction&gt;&lt;CapabilityID&gt;"
+                        + capability + "&lt;/CapabilityID&gt;&lt;CapabilityValue&gt;" + value
+                        + "&lt;/CapabilityValue&gt;&lt;/DeviceStatus&gt;" + "</DeviceStatusList>"
+                        + "</u:SetDeviceStatus>" + "</s:Body>" + "</s:Envelope>";
 
-            String wemoURL = getWemoURL();
+                String wemoURL = getWemoURL();
 
-            if (wemoURL != null) {
-                String wemoCallResponse = WemoHttpCall.executeCall(wemoURL, soapHeader, content);
-                if (wemoCallResponse != null) {
-                    if (capability != null && capability.equals("10008") && value != null) {
-                        OnOffType binaryState = null;
-                        binaryState = value.equals("0") ? OnOffType.OFF : OnOffType.ON;
-                        if (binaryState != null) {
-                            updateState(CHANNEL_STATE, binaryState);
+                if (wemoURL != null && capability != null && value != null) {
+                    String wemoCallResponse = WemoHttpCall.executeCall(wemoURL, soapHeader, content);
+                    if (wemoCallResponse != null) {
+                        if (capability != null && capability.equals("10008") && value != null) {
+                            OnOffType binaryState = null;
+                            binaryState = value.equals("0") ? OnOffType.OFF : OnOffType.ON;
+                            if (binaryState != null) {
+                                updateState(CHANNEL_STATE, binaryState);
+                            }
                         }
                     }
                 }
+            } catch (Exception e) {
+                throw new RuntimeException("Could not send command to WeMo Bridge", e);
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Could not send command to WeMo Bridge", e);
         }
-
     }
 
     @Override
@@ -342,6 +340,10 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
     }
 
     @Override
+    public void onServiceSubscribed(String service, boolean succeeded) {
+    }
+
+    @Override
     public void onValueReceived(String variable, String value, String service) {
         logger.trace("Received pair '{}':'{}' (service '{}') for thing '{}'",
                 new Object[] { variable, value, service, this.getThing().getUID() });
@@ -374,28 +376,53 @@ public class WemoLightHandler extends BaseThingHandler implements UpnpIOParticip
 
     private synchronized void onSubscription() {
         if (service.isRegistered(this)) {
-            logger.debug("Setting up WeMo GENA subscription for '{}'", this);
-            service.addSubscription(this, "bridge1", SUBSCRIPTION_DURATION);
+            logger.debug("Checking WeMo GENA subscription for '{}'", this);
+
+            String subscription = "bridge1";
+
+            if ((subscriptionState.get(subscription) == null) || !subscriptionState.get(subscription).booleanValue()) {
+                logger.debug("Setting up GENA subscription {}: Subscribing to service {}...", getUDN(), subscription);
+                service.addSubscription(this, subscription, SUBSCRIPTION_DURATION);
+                subscriptionState.put(subscription, true);
+            }
+
+        } else {
+            logger.debug("Setting up WeMo GENA subscription for '{}' FAILED - service.isRegistered(this) is FALSE",
+                    this);
         }
     }
 
     private synchronized void removeSubscription() {
         logger.debug("Removing WeMo GENA subscription for '{}'", this);
         if (service.isRegistered(this)) {
-            service.removeSubscription(this, "bridge1");
+            String subscription = null;
+
+            if ((subscriptionState.get(subscription) != null) && subscriptionState.get(subscription).booleanValue()) {
+                logger.debug("WeMo {}: Unsubscribing from service {}...", getUDN(), subscription);
+                service.removeSubscription(this, "bridge1");
+            }
+
+            subscriptionState = new HashMap<String, Boolean>();
             service.unregisterParticipant(this);
+
         }
     }
 
     private synchronized void onUpdate() {
-        if (service.isRegistered(this)) {
-            if (refreshJob == null || refreshJob.isCancelled()) {
-                int refreshInterval = DEFAULT_REFRESH_INTERVAL;
-                logger.trace("Start polling job for LightID '{}'", wemoLightID);
-                refreshJob = scheduler.scheduleAtFixedRate(refreshRunnable, 15, refreshInterval, TimeUnit.SECONDS);
-
+        if (refreshJob == null || refreshJob.isCancelled()) {
+            Configuration config = getThing().getConfiguration();
+            int refreshInterval = DEFAULT_REFRESH_INTERVAL;
+            Object refreshConfig = config.get("refresh");
+            if (refreshConfig != null) {
+                refreshInterval = ((BigDecimal) refreshConfig).intValue();
             }
+            logger.trace("Start polling job for LightID '{}'", wemoLightID);
+            refreshJob = scheduler.scheduleAtFixedRate(refreshRunnable, DEFAULT_REFRESH_INITIAL_DELAY, refreshInterval, TimeUnit.SECONDS);
         }
+    }
+
+    private boolean isUpnpDeviceRegistered() {
+        return service.isRegistered(this);
     }
 
     public String getWemoURL() {

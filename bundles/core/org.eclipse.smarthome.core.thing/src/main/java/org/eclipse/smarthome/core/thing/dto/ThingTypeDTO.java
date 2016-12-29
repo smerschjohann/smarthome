@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -19,22 +19,16 @@ import org.eclipse.smarthome.config.core.dto.ConfigDescriptionParameterGroupDTO;
  * @author Dennis Nobel - Initial contribution
  * @author Thomas Höfer - Added thing and thing type properties
  * @author Chris Jackson - Added parameter groups
+ * @author Miki Jankov - Introducing StrippedThingTypeDTO
  *
  */
-public class ThingTypeDTO {
+public class ThingTypeDTO extends StrippedThingTypeDTO {
 
     public List<ChannelDefinitionDTO> channels;
     public List<ChannelGroupDefinitionDTO> channelGroups;
     public List<ConfigDescriptionParameterDTO> configParameters;
-    public List<String> supportedBridgeTypeUIDs;
     public List<ConfigDescriptionParameterGroupDTO> parameterGroups;
     public Map<String, String> properties;
-    public String description;
-    public String label;
-    public boolean listed;
-
-    public String UID;
-    boolean bridge;
 
     public ThingTypeDTO() {
     }

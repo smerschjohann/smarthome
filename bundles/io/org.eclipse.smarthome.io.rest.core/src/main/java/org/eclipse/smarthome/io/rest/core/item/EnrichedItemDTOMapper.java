@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -51,10 +51,6 @@ public class EnrichedItemDTOMapper {
 
         if (item instanceof GroupItem) {
             GroupItem groupItem = (GroupItem) item;
-            String groupType = null;
-            if (groupItem.getBaseItem() != null) {
-                groupType = groupItem.getBaseItem().getType();
-            }
             EnrichedItemDTO[] memberDTOs;
             if (drillDown) {
                 Collection<EnrichedItemDTO> members = new LinkedHashSet<>();
@@ -65,7 +61,7 @@ public class EnrichedItemDTOMapper {
             } else {
                 memberDTOs = new EnrichedItemDTO[0];
             }
-            enrichedItemDTO = new EnrichedGroupItemDTO(itemDTO, groupType, memberDTOs, link, state, stateDescription);
+            enrichedItemDTO = new EnrichedGroupItemDTO(itemDTO, memberDTOs, link, state, stateDescription);
         } else {
             enrichedItemDTO = new EnrichedItemDTO(itemDTO, link, state, stateDescription);
         }

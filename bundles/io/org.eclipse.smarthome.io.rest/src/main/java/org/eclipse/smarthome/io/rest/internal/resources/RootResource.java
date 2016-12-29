@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -22,7 +22,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import org.eclipse.smarthome.io.rest.RESTConstants;
 import org.eclipse.smarthome.io.rest.RESTResource;
+import org.eclipse.smarthome.io.rest.SatisfiableRESTResource;
 import org.eclipse.smarthome.io.rest.internal.Constants;
 import org.eclipse.smarthome.io.rest.internal.resources.beans.RootBean;
 import org.osgi.service.cm.Configuration;
@@ -66,8 +68,12 @@ public class RootResource {
         RootBean bean = new RootBean();
 
         for (RESTResource resource : restResources) {
-            String path = resource.getClass().getAnnotation(Path.class).value();
-            bean.links.add(new RootBean.Links(path, uriInfo.getBaseUriBuilder().path(path).build().toASCIIString()));
+            // we will include all RESTResources and only the SatisfiableRESTResources that are currently satisfied
+            if (!(resource instanceof SatisfiableRESTResource) || ((SatisfiableRESTResource) resource).isSatisfied()) {
+                String path = resource.getClass().getAnnotation(Path.class).value();
+                bean.links
+                        .add(new RootBean.Links(path, uriInfo.getBaseUriBuilder().path(path).build().toASCIIString()));
+            }
         }
 
         return bean;
@@ -95,8 +101,8 @@ public class RootResource {
                 }
 
                 String rootAlias = (String) properties.get(Constants.JAXRS_CONNECTOR_ROOT_PROPERTY);
-                if (!Constants.REST_SERVLET_ALIAS.equals(rootAlias)) {
-                    properties.put(Constants.JAXRS_CONNECTOR_ROOT_PROPERTY, Constants.REST_SERVLET_ALIAS);
+                if (!RESTConstants.REST_URI.equals(rootAlias)) {
+                    properties.put(Constants.JAXRS_CONNECTOR_ROOT_PROPERTY, RESTConstants.REST_URI);
 
                     configuration.update(properties);
                 }

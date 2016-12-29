@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -31,10 +32,11 @@ import org.eclipse.smarthome.config.discovery.DiscoveryResultFlag;
 import org.eclipse.smarthome.config.discovery.dto.DiscoveryResultDTO;
 import org.eclipse.smarthome.config.discovery.dto.DiscoveryResultDTOMapper;
 import org.eclipse.smarthome.config.discovery.inbox.Inbox;
+import org.eclipse.smarthome.core.auth.Role;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingUID;
 import org.eclipse.smarthome.io.rest.JSONResponse;
-import org.eclipse.smarthome.io.rest.RESTResource;
+import org.eclipse.smarthome.io.rest.SatisfiableRESTResource;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -52,8 +54,9 @@ import io.swagger.annotations.ApiResponses;
  * @author Chris Jackson - Updated to use JSONResponse. Fixed null response from approve.
  */
 @Path(InboxResource.PATH_INBOX)
+@RolesAllowed({ Role.ADMIN })
 @Api(value = InboxResource.PATH_INBOX)
-public class InboxResource implements RESTResource {
+public class InboxResource implements SatisfiableRESTResource {
 
     /** The URI path to this resource */
     public static final String PATH_INBOX = "inbox";
@@ -146,6 +149,11 @@ public class InboxResource implements RESTResource {
             discoveryResultBeans.add(DiscoveryResultDTOMapper.map(discoveryResult));
         }
         return discoveryResultBeans;
+    }
+
+    @Override
+    public boolean isSatisfied() {
+        return inbox != null;
     }
 
 }

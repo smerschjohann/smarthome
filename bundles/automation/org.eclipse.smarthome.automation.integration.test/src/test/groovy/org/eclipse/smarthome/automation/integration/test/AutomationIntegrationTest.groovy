@@ -16,6 +16,7 @@ import static org.junit.matchers.JUnitMatchers.*
 
 import org.eclipse.smarthome.automation.Action
 import org.eclipse.smarthome.automation.Condition
+import org.eclipse.smarthome.automation.ManagedRuleProvider
 import org.eclipse.smarthome.automation.Rule
 import org.eclipse.smarthome.automation.RuleProvider
 import org.eclipse.smarthome.automation.RuleRegistry
@@ -29,8 +30,8 @@ import org.eclipse.smarthome.automation.events.RuleStatusInfoEvent
 import org.eclipse.smarthome.automation.events.RuleUpdatedEvent
 import org.eclipse.smarthome.automation.module.core.handler.GenericEventTriggerHandler
 import org.eclipse.smarthome.automation.template.RuleTemplate
+import org.eclipse.smarthome.automation.template.RuleTemplateProvider
 import org.eclipse.smarthome.automation.template.Template
-import org.eclipse.smarthome.automation.template.TemplateProvider
 import org.eclipse.smarthome.automation.template.TemplateRegistry
 import org.eclipse.smarthome.automation.type.ActionType
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider
@@ -38,7 +39,7 @@ import org.eclipse.smarthome.automation.type.ModuleTypeRegistry
 import org.eclipse.smarthome.automation.type.TriggerType
 import org.eclipse.smarthome.config.core.ConfigDescriptionParameter
 import org.eclipse.smarthome.config.core.Configuration
-import org.eclipse.smarthome.core.common.registry.ManagedProvider
+import org.eclipse.smarthome.core.common.registry.ProviderChangeListener
 import org.eclipse.smarthome.core.events.Event
 import org.eclipse.smarthome.core.events.EventPublisher
 import org.eclipse.smarthome.core.events.EventSubscriber
@@ -74,9 +75,9 @@ class AutomationIntegrationTest extends OSGiTest{
     def EventPublisher eventPublisher
     def ItemRegistry itemRegistry
     def RuleRegistry ruleRegistry
+    def ManagedRuleProvider managedRuleProvider
     def ModuleTypeRegistry moduleTypeRegistry
     def TemplateRegistry templateRegistry
-    def ManagedProvider<Rule, String> ruleManagedProvider
 
     @Before
     void before() {
@@ -120,9 +121,9 @@ class AutomationIntegrationTest extends OSGiTest{
         eventPublisher = getService(EventPublisher)
         itemRegistry = getService(ItemRegistry)
         ruleRegistry = getService(RuleRegistry)
+        managedRuleProvider = getService(ManagedRuleProvider)
         moduleTypeRegistry = getService(ModuleTypeRegistry)
         templateRegistry = getService(TemplateRegistry)
-        ruleManagedProvider = getService(RuleProvider)
         waitForAssert ({
             assertThat eventPublisher, is(notNullValue())
             assertThat storageService, is(notNullValue())
@@ -130,7 +131,7 @@ class AutomationIntegrationTest extends OSGiTest{
             assertThat ruleRegistry, is(notNullValue())
             assertThat moduleTypeRegistry, is(notNullValue())
             assertThat templateRegistry, is(notNullValue())
-            assertThat ruleManagedProvider, is(notNullValue())
+            assertThat managedRuleProvider, is(notNullValue())
         }, 9000)
         logger.info('@Before.finish')
     }
@@ -150,7 +151,7 @@ class AutomationIntegrationTest extends OSGiTest{
         def ruleEvent = null
 
         def ruleEventHandler = [
-            receive: {  Event e ->
+            receive: { Event e ->
                 logger.info("RuleEvent: " + e.topic)
                 ruleEvent = e
             },
@@ -170,11 +171,11 @@ class AutomationIntegrationTest extends OSGiTest{
             assertThat ruleEvent, is(notNullValue())
             assertThat ruleEvent, is(instanceOf(RuleAddedEvent))
             def ruleAddedEvent = ruleEvent as RuleAddedEvent
-            assertThat ruleAddedEvent.getRule().UID, is(rule.UID)
+            assertThat ruleAddedEvent.getRule().uid, is(rule.UID)
         })
         def Rule ruleAdded = ruleRegistry.get(rule.UID)
         assertThat ruleAdded, is(notNullValue())
-        assertThat ruleRegistry.getStatus(rule.UID).getStatus(), is(RuleStatus.IDLE)
+        assertThat ruleRegistry.getStatusInfo(rule.UID).getStatus(), is(RuleStatus.IDLE)
 
 
         //UPDATE
@@ -185,8 +186,8 @@ class AutomationIntegrationTest extends OSGiTest{
             assertThat ruleEvent, is(notNullValue())
             assertThat ruleEvent, is(instanceOf(RuleUpdatedEvent))
             def ruEvent = ruleEvent as RuleUpdatedEvent
-            assertThat ruEvent.getRule().UID, is(rule.UID)
-            assertThat ruEvent.getOldRule().UID, is(rule.UID)
+            assertThat ruEvent.getRule().uid, is(rule.UID)
+            assertThat ruEvent.getOldRule().uid, is(rule.UID)
             assertThat ruEvent.getRule().description, is("TestDescription")
             assertThat ruEvent.getOldRule().description, is(nullValue())
         })
@@ -200,7 +201,7 @@ class AutomationIntegrationTest extends OSGiTest{
             assertThat ruleEvent, is(notNullValue())
             assertThat ruleEvent, is(instanceOf(RuleRemovedEvent))
             def reEvent = ruleEvent as RuleRemovedEvent
-            assertThat reEvent.getRule().UID, is(removed.UID)
+            assertThat reEvent.getRule().uid, is(removed.UID)
         })
         assertThat removed, is(notNullValue())
         assertThat removed, is(ruleAdded)
@@ -215,7 +216,7 @@ class AutomationIntegrationTest extends OSGiTest{
         def actionConfig = new Configuration([itemName:"myLampItem3", command:"ON"])
         def triggers = [new Trigger("ItemStateChangeTrigger", "GenericEventTrigger", triggerConfig)]
 
-        def inputs = [topic: "ItemStateChangeTrigger.topic"]
+        def inputs = [topic: "ItemStateChangeTrigger.topic", event:"ItemStateChangeTrigger.event"]
 
         //def conditionInputs=[topicConnection] as Set
         def conditions = [new Condition("EventCondition_2", "EventCondition", condition1Config, inputs)]
@@ -256,7 +257,7 @@ class AutomationIntegrationTest extends OSGiTest{
             }, is(notNullValue())
         }, 9000, 200)
         waitForAssert({
-            assertThat ruleRegistry.getStatus(rule.UID).getStatus(), is(not(RuleStatus.RUNNING))
+            assertThat ruleRegistry.getStatusInfo(rule.UID).getStatus(), is(not(RuleStatus.RUNNING))
         })
     }
     @Test
@@ -266,7 +267,7 @@ class AutomationIntegrationTest extends OSGiTest{
         def condition1Config = new Configuration([topic:"smarthome/*"])
         def actionConfig = new Configuration([itemName:"myLampItem3", command:"ON"])
         def triggers = [new Trigger("ItemStateChangeTrigger", "GenericEventTriggerWhichDoesNotExist", triggerConfig)]
-        def inputs = [topic: "ItemStateChangeTrigger.topic"]
+        def inputs = [topic: "ItemStateChangeTrigger.topic", event:"ItemStateChangeTrigger.event"]
 
         //def conditionInputs=[topicConnection] as Set
         def conditions = [new Condition("EventCondition_2", "EventCondition", condition1Config, inputs)]
@@ -281,7 +282,7 @@ class AutomationIntegrationTest extends OSGiTest{
 
         ruleRegistry.add(rule)
 
-        assertThat ruleRegistry.getStatus(rule.UID).getStatus(), is(RuleStatus.NOT_INITIALIZED)
+        assertThat ruleRegistry.getStatusInfo(rule.UID).getStatus(), is(RuleStatus.NOT_INITIALIZED)
     }
 
     @Test
@@ -289,21 +290,21 @@ class AutomationIntegrationTest extends OSGiTest{
         logger.info('assert that a rule switches from IDLE to NOT_INITIALIZED if a moduleHanlder disappears and back to IDLE if it appears again')
         def Rule rule = createSimpleRule()
         ruleRegistry.add(rule)
-        assertThat ruleRegistry.getStatus(rule.UID).getStatus(), is(RuleStatus.IDLE)
+        assertThat ruleRegistry.getStatusInfo(rule.UID).getStatus(), is(RuleStatus.IDLE)
 
         def moduleBundle = FrameworkUtil.getBundle(GenericEventTriggerHandler)
         moduleBundle.stop()
         waitForAssert({
-            logger.info("RuleStatus: {}", ruleRegistry.getStatus(rule.UID).getStatus())
-            assertThat ruleRegistry.getStatus(rule.UID).getStatus(), is(RuleStatus.NOT_INITIALIZED)
+            logger.info("RuleStatus: {}", ruleRegistry.getStatusInfo(rule.UID).getStatus())
+            assertThat ruleRegistry.getStatusInfo(rule.UID).getStatus(), is(RuleStatus.NOT_INITIALIZED)
         },3000,100)
 
 
         moduleBundle.start()
         ruleRegistry.setEnabled(rule.UID,true)
         waitForAssert({
-            logger.info("RuleStatus: {}", ruleRegistry.getStatus(rule.UID))
-            assertThat ruleRegistry.getStatus(rule.UID).getStatus(), is(RuleStatus.IDLE)
+            logger.info("RuleStatus: {}", ruleRegistry.getStatusInfo(rule.UID))
+            assertThat ruleRegistry.getStatusInfo(rule.UID).getStatus(), is(RuleStatus.IDLE)
         },3000,100)
     }
 
@@ -360,7 +361,7 @@ class AutomationIntegrationTest extends OSGiTest{
 
         //TEST RULE
         waitForAssert({
-            assertThat ruleRegistry.getStatus(rule.uid).getStatus(), is(RuleStatus.IDLE)
+            assertThat ruleRegistry.getStatusInfo(rule.uid).getStatus(), is(RuleStatus.IDLE)
         })
 
         def EventPublisher eventPublisher = getService(EventPublisher)
@@ -422,7 +423,7 @@ class AutomationIntegrationTest extends OSGiTest{
 
         //TEST RULE
         waitForAssert({
-            assertThat ruleRegistry.getStatus(rule.uid).getStatus(), is(RuleStatus.IDLE)
+            assertThat ruleRegistry.getStatusInfo(rule.uid).getStatus(), is(RuleStatus.IDLE)
         })
 
         def EventPublisher eventPublisher = getService(EventPublisher)
@@ -493,7 +494,7 @@ class AutomationIntegrationTest extends OSGiTest{
             assertThat ruleRegistry.getAll().isEmpty(), is(false)
             def rule2 = ruleRegistry.getAll().find{it.tags!=null && it.tags.contains("myRule21")} as Rule
             assertThat rule2, is(notNullValue())
-            def ruleStatus2 = ruleRegistry.getStatus(rule2.uid) as RuleStatusInfo
+            def ruleStatus2 = ruleRegistry.getStatusInfo(rule2.uid) as RuleStatusInfo
             assertThat ruleStatus2.getStatus(), is(RuleStatus.IDLE)
         }, 10000, 200)
 
@@ -554,9 +555,9 @@ class AutomationIntegrationTest extends OSGiTest{
 
         def rule2 = createSimpleRule()
         assertThat ruleRegistry.getAll().find{it.UID==rule2.UID}, is(nullValue())
-        ruleManagedProvider.add(rule2)
+        managedRuleProvider.add(rule2)
         assertThat ruleRegistry.getAll().find{it.UID==rule2.UID}, is(notNullValue())
-        ruleManagedProvider.remove(rule2.UID)
+        managedRuleProvider.remove(rule2.UID)
         assertThat ruleRegistry.getAll().find{it.UID==rule2.UID}, is(nullValue())
     }
 
@@ -613,7 +614,7 @@ class AutomationIntegrationTest extends OSGiTest{
         assertThat ruleRegistry.getAll().find{it.UID==templateRule.UID}, is(notNullValue())
         waitForAssert {
             assertThat ruleRegistry.get(templateRule.UID), is(notNullValue())
-            assertThat ruleRegistry.getStatus(templateRule.UID).status, is(RuleStatus.IDLE)
+            assertThat ruleRegistry.getStatus(templateRule.UID), is(RuleStatus.IDLE)
         }
 
         //bring the rule to execution:
@@ -654,11 +655,15 @@ class AutomationIntegrationTest extends OSGiTest{
                     return null
                 }
             },
-
             getTemplates:{Locale locale->
                 return [template]
+            },
+            getAll:{ return [template]},
+            addProviderChangeListener:{ ProviderChangeListener listener ->
+            },
+            removeProviderChangeListener:{ ProviderChangeListener listener ->
             }
-        ] as TemplateProvider
+        ] as RuleTemplateProvider
 
         def moduleTypeProvider=[
             getModuleType:{String UID, Locale locale->
@@ -672,21 +677,25 @@ class AutomationIntegrationTest extends OSGiTest{
             },
             getModuleTypes:{Locale locale ->
                 return [triggerType, actionType]
+            },
+            getAll:{ return [triggerType, actionType]},
+            addProviderChangeListener:{ ProviderChangeListener listener ->
+            },
+            removeProviderChangeListener:{ ProviderChangeListener listener ->
             }
         ] as ModuleTypeProvider
 
         registerService(templateProvider)
         assertThat templateRegistry.get(templateUID), is(notNullValue())
+        unregisterService(templateProvider)
+        assertThat templateRegistry.get(templateUID), is(nullValue())
+
         registerService(moduleTypeProvider)
         assertThat moduleTypeRegistry.get(actionTypeUID), is(notNullValue())
         assertThat moduleTypeRegistry.get(triggerTypeUID), is(notNullValue())
-
-        unregisterService(templateProvider)
-        assertThat templateRegistry.get(templateUID), is(nullValue())
         unregisterService(moduleTypeProvider)
         assertThat moduleTypeRegistry.get(actionTypeUID), is(nullValue())
         assertThat moduleTypeRegistry.get(triggerTypeUID), is(nullValue())
-
     }
 
     /**
@@ -748,7 +757,7 @@ class AutomationIntegrationTest extends OSGiTest{
             assertThat ruleRegistry.getAll().isEmpty(), is(false)
             def rule2 = ruleRegistry.get(rule.UID)
             assertThat rule2, is(notNullValue())
-            def ruleStatus2 = ruleRegistry.getStatus(rule2.uid).status as RuleStatus
+            def ruleStatus2 = ruleRegistry.getStatusInfo(rule2.uid).status as RuleStatus
             assertThat ruleStatus2, is(RuleStatus.IDLE)
         }, 10000, 200)
 

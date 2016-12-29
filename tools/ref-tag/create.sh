@@ -56,7 +56,9 @@ MY_CMD="${0}"
 MY_CMD_ABS="$(get_abs "${MY_CMD}")" || die "Cannot resolve path"
 MY_DIRNAME_ABS="$(dirname "${MY_CMD_ABS}")"
 
-REMOTE=origin
+if [ -z "${REMOTE}" ]; then
+  REMOTE=origin
+fi
 unset COMMIT_ID_WC
 
 #
@@ -131,19 +133,19 @@ VERSION_OLD_QUALI="${VERSION_OLD_MMR}.qualifier"
 if [ -z "${VERSION_NEW_MMR}" ]; then
   VERSION_NEW_MMR="${VERSION_OLD_MMR}"
 fi
-if [ -n "${VERSION_NEW_CLASSI}" ]; then
-  case "${VERSION_NEW_CLASSI}" in
+if [ -n "${VERSION_NEW_QUALI}" ]; then
+  case "${VERSION_NEW_QUALI}" in
     SNAPSHOT)
-      VERSION_NEW="${VERSION_NEW_MMR}-${VERSION_NEW_CLASSI}"
+      VERSION_NEW="${VERSION_NEW_MMR}-${VERSION_NEW_QUALI}"
       ;;
     *)
-      VERSION_NEW="${VERSION_NEW_MMR}.${VERSION_NEW_CLASSI}"
+      VERSION_NEW="${VERSION_NEW_MMR}.${VERSION_NEW_QUALI}"
       ;;
   esac
 else
-  VERSION_NEW="${VERSION_NEW_MMR}"
+  VERSION_NEW_QUALI=".qualifier"
+  VERSION_NEW="${VERSION_NEW_MMR}".{VERSION_NEW_QUALI}
 fi
-VERSION_NEW_QUALI="${VERSION_NEW_MMR}.qualifier"
 
 #
 # Print version info
@@ -181,11 +183,7 @@ for FILE in \
   docs/documentation/community/downloads.md \
   docs/pom.xml \
   extensions/binding/create_binding_skeleton.cmd \
-  extensions/binding/create_binding_skeleton.sh \
-  protocols/enocean/org.eclipse.smarthome.protocols.enocean.basedriver.impl/pom.xml \
-  protocols/enocean/org.eclipse.smarthome.protocols.enocean.eeps.basic/pom.xml \
-  protocols/enocean/org.eclipse.smarthome.protocols.enocean.sample.client/pom.xml \
-  protocols/enocean/pom.xml
+  extensions/binding/create_binding_skeleton.sh
 do
   sed 's:'"${VERSION_OLD}"':'"${VERSION_NEW}"':g' -i "${FILE}"
 done
@@ -197,12 +195,6 @@ done
 #do
 #  sed 's:\("version"\: *"\).*\(".*\):\1'"${VERSION_NEW_MMR}"'\2:g' -i "${FILE}"
 #done
-
-for FILE in \
-   protocols/enocean/README.md
-do
-  sed 's:\(org\.eclipse\.smarthome.* (\)'"${VERSION_OLD_MMR}"')\(.*\):\1'"${VERSION_NEW_MMR}"')\2:g' -i "${FILE}"
-done
 
 #
 # Check if maven could build

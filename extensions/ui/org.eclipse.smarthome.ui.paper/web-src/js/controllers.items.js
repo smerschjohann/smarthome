@@ -1,12 +1,21 @@
 angular.module('PaperUI.controllers.configuration').controller('ItemSetupController', function($scope, $timeout, $mdDialog, $filter, itemService, toastService, sharedProperties) {
     $scope.setSubtitle([ 'Items' ]);
     $scope.setHeaderText('Shows all configured Items.');
-    $scope.items = [];
+    $scope.items = [], $scope.groups = [], $scope.types = [];
     $scope.refresh = function() {
-        itemService.getNonRecursiveAll(function(items) {
-            $scope.items = $filter('filter')(items, {
-                type : '!GroupItem'
-            })
+        itemService.getAll(function(items) {
+            $scope.items = items;
+            var groups = [], types = [];
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type && items[i].type == "Group") {
+                    groups.push(items[i]);
+                }
+                if (items[i].type && types.indexOf(items[i].type) == -1) {
+                    types.push(items[i].type);
+                }
+            }
+            $scope.groups = groups;
+            $scope.types = types;
         });
 
     };
@@ -14,7 +23,7 @@ angular.module('PaperUI.controllers.configuration').controller('ItemSetupControl
         event.stopImmediatePropagation();
         $mdDialog.show({
             controller : 'ItemRemoveController',
-            templateUrl : 'partials/dialog.removeitem.html',
+            templateUrl : 'partials/dialog.remove.html',
             targetEvent : event,
             hasBackdrop : true,
             locals : {
@@ -27,25 +36,113 @@ angular.module('PaperUI.controllers.configuration').controller('ItemSetupControl
     $scope.getSrcURL = function(category, type) {
         return category ? '../icon/' + category.toLowerCase() : type ? '../icon/' + type.toLowerCase().replace('item', '') : '';
     }
+    $scope.filterItems = function() {
+        return function(item) {
+            var filtered = isFiltered(item);
+            if ($scope.searchText && $scope.searchText.length > 0) {
+                if ((item.name && item.name.toUpperCase().indexOf($scope.searchText.toUpperCase()) != -1) || (item.label && item.label.toUpperCase().indexOf($scope.searchText.toUpperCase()) != -1)) {
+                    return filtered
+                }
+                return false;
+            } else {
+                return filtered;
+            }
+        }
+    }
+    function isFiltered(item) {
+        if (!$scope.selectedGroup && !$scope.selectedType) {
+            return true;
+        } else if ($scope.selectedGroup && !$scope.selectedType && item.groupNames.indexOf($scope.selectedGroup.name) != -1) {
+            return true
+        } else if (!$scope.selectedGroup && $scope.selectedType && item.type && $scope.selectedType == item.type) {
+            return item.type ? $scope.selectedType == item.type : false;
+        } else if ($scope.selectedGroup && $scope.selectedType) {
+            return item.groupNames.indexOf($scope.selectedGroup.name) != -1 && $scope.selectedType == item.type;
+        }
+    }
+    $scope.setGroupFilter = function(item) {
+        if (item.type == "Group") {
+            $scope.selectedGroup = item;
+            $scope.showMore = true;
+        }
+    }
+    $scope.setTypeFilter = function(item) {
+        if (item.type) {
+            $scope.selectedType = item.type;
+            $scope.showMore = true;
+        }
+    }
+
+    $scope.searchInOptions = function(arr, properties, value) {
+        if (!value) {
+            return arr;
+        }
+        return $.grep(arr, function(option) {
+            if (!properties) {
+                return option && option.toUpperCase().indexOf(value.toUpperCase()) != -1;
+            } else {
+                for (var i = 0; i < properties.length; i++) {
+                    var property = properties[i];
+                    if (option.hasOwnProperty(property) && option[property] != "" && option[property].toUpperCase().indexOf(value.toUpperCase()) != -1) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+
+    }
+    $scope.clearAll = function() {
+        $scope.searchText = "";
+        $scope.searchType = "";
+        $scope.searchGroup = "";
+    }
+    $scope.createItem = function(selectedType, selectedGroup) {
+        sharedProperties.updateParams({
+            selectedType : selectedType,
+            selectedGroup : selectedGroup ? selectedGroup.name : ''
+        });
+        $scope.navigateTo('item/create')
+    }
+
     $scope.refresh();
-}).controller('ItemConfigController', function($scope, $mdDialog, $filter, $location, toastService, itemService, itemConfig, itemRepository) {
+}).controller('ItemConfigController', function($scope, $mdDialog, $filter, $location, toastService, itemService, itemConfig, itemRepository, sharedProperties) {
     $scope.items = [];
     $scope.oldCategory;
     $scope.types = itemConfig.types;
+    $scope.groupTypes = itemConfig.groupTypes;
+    $scope.functions = [];
+    $scope.selectedMember = null;
+    $scope.selectedParent = null;
+    $scope.searchText = null;
+    $scope.childItems = [];
+    $scope.linking = false;
     var itemName;
     var originalItem = {};
-    if ($scope.path && $scope.path.length > 4) {
+    if (sharedProperties.getParams().length > 0 && sharedProperties.getParams()[0].linking) {
+        $scope.linking = true;
+        $scope.types = sharedProperties.getParams()[0].acceptedItemType;
+    } else if ($scope.path && $scope.path.length > 4) {
         itemName = $scope.path[4];
     }
-    itemService.getNonRecursiveAll(function(items) {
+    itemService.getAll(function(items) {
         $scope.items = items;
         if (itemName) {
             var items = $filter('filter')(items, {
                 name : itemName
-            });
+            }, true);
             if (items.length > 0) {
                 $scope.item = items[0];
+                setFunctionToItem();
                 angular.copy($scope.item, originalItem);
+                if (!$scope.item['function']) {
+                    $scope.item['function'] = {
+                        name : ''
+                    };
+                }
+                if (!$scope.item.groupType) {
+                    $scope.item.groupType = "None";
+                }
                 $scope.configMode = "edit";
                 $scope.srcURL = $scope.getSrcURL($scope.item.category, $scope.item.type);
                 $scope.oldCategory = $scope.item.category;
@@ -54,9 +151,33 @@ angular.module('PaperUI.controllers.configuration').controller('ItemSetupControl
             }
         } else {
             $scope.item = {};
-            $scope.setTitle('Configuration');
-            $scope.setSubtitle([ 'New Item' ]);
+            $scope.item.groupNames = [];
+            if ($scope.setTitle) {
+                $scope.setTitle('Configuration');
+            }
+            if ($scope.setSubtitle) {
+                $scope.setSubtitle([ 'New Item' ]);
+            }
+            if ($scope.types.length > 0) {
+                $scope.item.type = $scope.types[0];
+            }
+            if (sharedProperties.getParams().length > 0) {
+                if (sharedProperties.getParams()[0].linking) {
+                    $scope.item.name = sharedProperties.getParams()[0].suggestedName;
+                    $scope.item.label = sharedProperties.getParams()[0].suggestedLabel;
+                    $scope.item.category = sharedProperties.getParams()[0].suggestedCategory;
+                } else {
+                    if (sharedProperties.getParams()[0].selectedType) {
+                        $scope.item.type = sharedProperties.getParams()[0].selectedType;
+                    }
+                    if (sharedProperties.getParams()[0].selectedGroup) {
+                        $scope.item.groupNames = $scope.item.groupNames ? $scope.item.groupNames : [];
+                        $scope.item.groupNames.push(sharedProperties.getParams()[0].selectedGroup);
+                    }
+                }
+            }
             $scope.configMode = "create";
+
         }
 
     });
@@ -64,27 +185,131 @@ angular.module('PaperUI.controllers.configuration').controller('ItemSetupControl
     $scope.update = function() {
         putItem("Item updated.");
     }
-    $scope.create = function(item) {
+    $scope.create = function() {
         putItem("Item created.");
     }
 
     function putItem(text) {
+        if ($scope.item.type !== "Group") {
+            delete $scope.item['function'];
+            delete $scope.item.groupType;
+        } else {
+            setItemToFunction();
+        }
         if (JSON.stringify($scope.item) !== JSON.stringify(originalItem)) {
             itemService.create({
                 itemName : $scope.item.name
             }, $scope.item).$promise.then(function() {
                 toastService.showDefaultToast(text);
                 itemRepository.setDirty(true);
-                $location.path('configuration/items');
+                if ($scope.linking) {
+                    $scope.$emit("ItemCreated", {
+                        status : true,
+                        itemName : $scope.item.name,
+                        label : $scope.item.label
+                    });
+                } else {
+                    $location.path('configuration/items');
+                }
+                sharedProperties.resetParams();
             }, function(failed) {
-                $location.path('configuration/items');
+                if ($scope.linking) {
+                    $scope.$emit("ItemCreated", {
+                        status : false
+                    });
+                } else {
+                    $location.path('configuration/items');
+                }
+                sharedProperties.resetParams();
             });
+        } else {
+            toastService.showDefaultToast(text);
+            $location.path('configuration/items');
+        }
+    }
+
+    function setItemToFunction() {
+        if ($scope.item.groupType.indexOf("None") == -1) {
+            var splitValue = $scope.item['function'].name.split('_');
+            $scope.item['function'].name = splitValue[0];
+            if (splitValue.length > 1) {
+                $scope.item['function'].params = [ splitValue[1], splitValue[2] ];
+            }
+
+        }
+        if ($scope.item['function'] && !$scope.item['function'].name) {
+            $scope.item['function'] = null;
+        }
+    }
+
+    function setFunctionToItem() {
+        if ($scope.item['function'] && $scope.item['function'].name && $scope.item['function'].params) {
+            $scope.item['function'].name += "_" + $scope.item['function'].params[0] + "_" + $scope.item['function'].params[1];
         }
     }
 
     $scope.renderIcon = function() {
         $scope.oldCategory = $scope.item.category;
         $scope.srcURL = $scope.getSrcURL($scope.item.category, $scope.item.type);
+    }
+
+    $scope.searchItem = function(searchText, onlyGroups) {
+        var criterion = {
+            name : searchText
+        };
+        if (onlyGroups) {
+            criterion.type = "Group";
+        }
+        var items = $filter('filter')($scope.items, criterion);
+        items = $filter('orderBy')(items, 'name');
+        if (items.indexOf($scope.item.name) != -1) {
+            items.splice(items.indexOf($scope.item.name), 1);
+        }
+        return items.map(function(item) {
+            return item.name;
+        });
+    }
+
+    $scope.openItem = function() {
+        $location.path('configuration/item/edit/' + $scope.selectedItem);
+    }
+
+    $scope.setParentItem = function($chip) {
+        if ($chip) {
+            $scope.selectedParent = $chip;
+        } else {
+            $scope.selectedParent = null;
+        }
+    }
+    $scope.setMemberItem = function($chip) {
+        if ($chip) {
+            $scope.selectedMember = $chip;
+        } else {
+            $scope.selectedMember = null;
+        }
+    }
+
+    $scope.boxClicked = function() {
+        $scope.selectedItem = null;
+    }
+    $scope.$on('ItemLinkedClicked', function(event, args) {
+        event.preventDefault();
+        $scope.create();
+    });
+
+    $scope.$watch('item.groupType', function() {
+        if (!$scope.item) {
+            return;
+        }
+        if ($scope.item.groupType === 'Number' || $scope.item.groupType === 'Dimmer') {
+            $scope.functions = itemConfig.arithmeticFunctions;
+        } else {
+            $scope.functions = itemConfig.logicalFunctions;
+        }
+    });
+
+    $scope.getSrcURL = function(category, type) {
+        return category ? '../icon/' + category.toLowerCase() : type ? '../icon/' + type.toLowerCase().replace('item', '') : '';
     }
 
 }).controller('ItemRemoveController', function($scope, $mdDialog, $filter, $location, toastService, itemService, itemRepository, item) {
@@ -133,6 +358,49 @@ angular.module('PaperUI.controllers.configuration').controller('ItemSetupControl
                 return scope.items;
             }
             ctrl.$parsers.push(customValidator);
+            setTimeout(function() {
+                if (ctrl.$viewValue) {
+                    customValidator(ctrl.$viewValue);
+                }
+            });
         }
     };
+}).directive('mdChips', function() {
+    return {
+        restrict : 'E',
+        require : 'mdChips',
+        link : function(scope, element, attributes, ctrl) {
+            setTimeout(deferListeners, 500);
+            function deferListeners() {
+                var chipContents = element[0].getElementsByClassName('md-chip-content');
+                for (var i = 0; i < chipContents.length; i++) {
+                    chipContents[i].addEventListener("blur", function() {
+                        ctrl.$scope.$apply();
+                    });
+                }
+            }
+            scope.createChip = function(chip) {
+                setTimeout(deferListeners, 500);
+                function deferListeners() {
+                    var chipContents = document.getElementsByClassName('md-chip-content');
+                    for (var i = 0; i < chipContents.length; i++) {
+                        chipContents[i].addEventListener("blur", addChipBlurEvent);
+                    }
+                }
+            }
+            function addChipBlurEvent() {
+                scope.$apply();
+                setTimeout(function() {
+                    // scope.selectedItem = null;
+                    scope.$apply();
+                }, 300);
+            }
+            scope.removeChip = function(chipIndex) {
+                var chipContents = document.getElementsByClassName('md-chip-content');
+                if (chipContents.length > chipIndex) {
+                    chipContents[chipIndex].removeEventListener("blur", addChipBlurEvent);
+                }
+            }
+        }
+    }
 });

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@ package org.eclipse.smarthome.io.rest.core.link;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -22,6 +23,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
+import org.eclipse.smarthome.core.auth.Role;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.link.AbstractLink;
 import org.eclipse.smarthome.core.thing.link.ItemChannelLink;
@@ -30,7 +32,7 @@ import org.eclipse.smarthome.core.thing.link.ThingLinkManager;
 import org.eclipse.smarthome.core.thing.link.dto.AbstractLinkDTO;
 import org.eclipse.smarthome.core.thing.link.dto.ItemChannelLinkDTO;
 import org.eclipse.smarthome.io.rest.JSONResponse;
-import org.eclipse.smarthome.io.rest.RESTResource;
+import org.eclipse.smarthome.io.rest.SatisfiableRESTResource;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -46,8 +48,9 @@ import io.swagger.annotations.ApiResponses;
  * @author Kai Kreuzer - Removed Thing links and added auto link url
  */
 @Path(ItemChannelLinkResource.PATH_LINKS)
+@RolesAllowed({ Role.ADMIN })
 @Api(value = ItemChannelLinkResource.PATH_LINKS)
-public class ItemChannelLinkResource implements RESTResource {
+public class ItemChannelLinkResource implements SatisfiableRESTResource {
 
     /** The URI path to this resource */
     public static final String PATH_LINKS = "links";
@@ -134,6 +137,11 @@ public class ItemChannelLinkResource implements RESTResource {
             beans.add(bean);
         }
         return beans;
+    }
+
+    @Override
+    public boolean isSatisfied() {
+        return itemChannelLinkRegistry != null && thingLinkManager != null;
     }
 
 }

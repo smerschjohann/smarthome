@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+    Copyright (c) 2014-2016 by the respective copyright holders.
     All rights reserved. This program and the accompanying materials
     are made available under the terms of the Eclipse Public License v1.0
     which accompanies this distribution, and is available at
@@ -19,12 +19,19 @@
    </description>
 
    <copyright>
-      Copyright (C) 2014 openHAB UG (haftungsbeschränkt) and others
+      Copyright (C) 2014-2016 the respective copyright holders
    </copyright>
 
    <license url="%licenseURL">
       %license
    </license>
+
+   <plugin
+         id="org.eclipse.smarthome.auth.jaas"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
 
    <plugin
          id="org.eclipse.smarthome.core"
@@ -174,6 +181,13 @@
          unpack="false"/>
 
    <plugin
+         id="org.eclipse.smarthome.storage.json"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
          id="org.eclipse.smarthome.storage.mapdb"
          download-size="0"
          install-size="0"
@@ -230,14 +244,28 @@
          unpack="false"/>
 
    <plugin
-         id="org.eclipse.smarthome.io.audio"
+         id="org.eclipse.smarthome.core.audio"
          download-size="0"
          install-size="0"
          version="0.0.0"
          unpack="false"/>
 
    <plugin
-         id="org.eclipse.smarthome.io.voice"
+         id="org.eclipse.smarthome.core.voice"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.smarthome.io.javasound"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
+         id="org.eclipse.smarthome.io.webaudio"
          download-size="0"
          install-size="0"
          version="0.0.0"

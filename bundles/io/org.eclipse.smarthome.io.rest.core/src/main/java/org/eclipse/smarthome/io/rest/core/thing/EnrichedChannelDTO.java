@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,7 +9,6 @@ package org.eclipse.smarthome.io.rest.core.thing;
 
 import java.util.HashSet;
 import java.util.Set;
-
 import org.eclipse.smarthome.core.thing.dto.ChannelDTO;
 
 /**
@@ -27,6 +26,7 @@ public class EnrichedChannelDTO extends ChannelDTO {
         this.id = channelDTO.id;
         this.channelTypeUID = channelDTO.channelTypeUID;
         this.itemType = channelDTO.itemType;
+        this.kind = channelDTO.kind;
         this.label = channelDTO.label;
         this.description = channelDTO.description;
         this.properties = channelDTO.properties;

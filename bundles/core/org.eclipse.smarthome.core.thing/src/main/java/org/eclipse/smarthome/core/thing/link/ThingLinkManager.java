@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,14 +12,20 @@ import java.util.List;
 import org.eclipse.smarthome.core.common.registry.Provider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.eclipse.smarthome.core.common.registry.RegistryChangeListener;
+import org.eclipse.smarthome.core.events.AbstractTypedEventSubscriber;
+import org.eclipse.smarthome.core.items.Item;
+import org.eclipse.smarthome.core.items.ItemRegistry;
 import org.eclipse.smarthome.core.thing.Channel;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.ManagedThingProvider;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingRegistry;
+import org.eclipse.smarthome.core.thing.ThingStatus;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
+import org.eclipse.smarthome.core.thing.events.ThingStatusInfoChangedEvent;
 import org.eclipse.smarthome.core.thing.type.ChannelType;
 import org.eclipse.smarthome.core.thing.type.TypeResolver;
+import org.eclipse.smarthome.core.thing.util.ThingHandlerHelper;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,19 +40,26 @@ import org.slf4j.LoggerFactory;
  * @author Markus Rathgeb - Handle item registry's all items changed notification
  * @author Kai Kreuzer - Refactored to make it a service and introduced the auto-linking (as a replacement for the
  *         ThingSetupManager)
+ * @author Markus Rathgeb - Send link notification if item and link exists and unlink on the first removal
  */
-public class ThingLinkManager {
+public class ThingLinkManager extends AbstractTypedEventSubscriber<ThingStatusInfoChangedEvent> {
+
+    public ThingLinkManager() {
+        super(ThingStatusInfoChangedEvent.TYPE);
+    }
 
     private Logger logger = LoggerFactory.getLogger(ThingLinkManager.class);
 
     private ThingRegistry thingRegistry;
     private ManagedThingProvider managedThingProvider;
+    private ItemRegistry itemRegistry;
     private ItemChannelLinkRegistry itemChannelLinkRegistry;
 
     private boolean autoLinks = true;
 
     protected void activate(ComponentContext context) {
         modified(context);
+        itemRegistry.addRegistryChangeListener(itemRegistryChangeListener);
         itemChannelLinkRegistry.addRegistryChangeListener(itemChannelLinkRegistryChangeListener);
         managedThingProvider.addProviderChangeListener(managedThingProviderListener);
     }
@@ -60,8 +73,17 @@ public class ThingLinkManager {
     }
 
     protected void deactivate() {
+        itemRegistry.removeRegistryChangeListener(itemRegistryChangeListener);
         itemChannelLinkRegistry.removeRegistryChangeListener(itemChannelLinkRegistryChangeListener);
         managedThingProvider.removeProviderChangeListener(managedThingProviderListener);
+    }
+
+    protected void setItemRegistry(ItemRegistry itemRegistry) {
+        this.itemRegistry = itemRegistry;
+    }
+
+    protected void unsetItemRegistry(ItemRegistry itemRegistry) {
+        this.itemRegistry = null;
     }
 
     protected void setItemChannelLinkRegistry(ItemChannelLinkRegistry itemChannelLinkRegistry) {
@@ -92,10 +114,52 @@ public class ThingLinkManager {
         return autoLinks;
     }
 
+    private final RegistryChangeListener<Item> itemRegistryChangeListener = new RegistryChangeListener<Item>() {
+        @Override
+        public void added(Item element) {
+            for (final ChannelUID channelUID : itemChannelLinkRegistry.getBoundChannels(element.getName())) {
+                final Thing thing = thingRegistry.get(channelUID.getThingUID());
+                if (thing != null) {
+                    final Channel channel = thing.getChannel(channelUID.getId());
+                    if (channel != null) {
+                        ThingLinkManager.this.informHandlerAboutLinkedChannel(thing, channel);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void removed(Item element) {
+            for (final ChannelUID channelUID : itemChannelLinkRegistry.getBoundChannels(element.getName())) {
+                final Thing thing = thingRegistry.get(channelUID.getThingUID());
+                if (thing != null) {
+                    final Channel channel = thing.getChannel(channelUID.getId());
+                    if (channel != null) {
+                        ThingLinkManager.this.informHandlerAboutUnlinkedChannel(thing, channel);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void updated(Item oldElement, Item element) {
+            if (!oldElement.equals(element)) {
+                this.removed(oldElement);
+                this.added(element);
+            }
+        }
+
+    };
+
     private final RegistryChangeListener<ItemChannelLink> itemChannelLinkRegistryChangeListener = new RegistryChangeListener<ItemChannelLink>() {
 
         @Override
         public void added(ItemChannelLink itemChannelLink) {
+            if (itemRegistry.get(itemChannelLink.getItemName()) == null) {
+                // Don't inform about the link if the item does not exist.
+                // The handler will be informed on item creation.
+                return;
+            }
             ChannelUID channelUID = itemChannelLink.getUID();
             Thing thing = thingRegistry.get(channelUID.getThingUID());
             if (thing != null) {
@@ -108,6 +172,11 @@ public class ThingLinkManager {
 
         @Override
         public void removed(ItemChannelLink itemChannelLink) {
+            /*
+             * Don't check for item existence here.
+             * If an item and its link are removed before the registry change listener methods are called,
+             * a check for the item could prevent that the handler is informed about the unlink at all.
+             */
             ChannelUID channelUID = itemChannelLink.getUID();
             Thing thing = thingRegistry.get(channelUID.getThingUID());
             if (thing != null) {
@@ -184,6 +253,11 @@ public class ThingLinkManager {
     };
 
     private void informHandlerAboutLinkedChannel(Thing thing, Channel channel) {
+        // Don't notify the thing if the thing isn't initialised
+        if (!ThingHandlerHelper.isHandlerInitialized(thing)) {
+            return;
+        }
+
         ThingHandler handler = thing.getHandler();
         if (handler != null) {
             try {
@@ -198,6 +272,11 @@ public class ThingLinkManager {
     }
 
     private void informHandlerAboutUnlinkedChannel(Thing thing, Channel channel) {
+        // Don't notify the thing if the thing isn't initialised
+        if (!ThingHandlerHelper.isHandlerInitialized(thing)) {
+            return;
+        }
+
         ThingHandler handler = thing.getHandler();
         if (handler != null) {
             try {
@@ -211,4 +290,23 @@ public class ThingLinkManager {
                     thing.getUID());
         }
     }
+
+    @Override
+    protected void receiveTypedEvent(ThingStatusInfoChangedEvent event) {
+        // when a thing handler is successfully initialized (i.e. it goes from INITIALIZING to UNKNOWN, ONLINE or
+        // OFFLINE), we need to make sure that channelLinked() is called for all existing links
+        if (ThingStatus.INITIALIZING.equals(event.getOldStatusInfo().getStatus())) {
+            if (ThingHandlerHelper.isHandlerInitialized(event.getStatusInfo().getStatus())) {
+                Thing thing = thingRegistry.get(event.getThingUID());
+                if (thing != null) {
+                    for (Channel channel : thing.getChannels()) {
+                        if (itemChannelLinkRegistry.getLinkedItemNames(channel.getUID()).size() > 0) {
+                            informHandlerAboutLinkedChannel(thing, channel);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

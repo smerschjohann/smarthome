@@ -10,9 +10,9 @@ var angularFilesort = require('gulp-angular-filesort'),
     rename = require("gulp-rename"),
     uglify = require('gulp-uglify'),
     inject = require('gulp-inject'),
-    util = require('gulp-util');
+    util = require('gulp-util'),
+    Server = require('karma').Server;
 var isDevelopment = !!util.env.development;
-
 
 var paths = {
     scripts: [
@@ -22,6 +22,7 @@ var paths = {
         './web-src/js/main.js',
         './web-src/js/shared.properties.js',
         './web-src/js/controllers.module.js',
+        './web-src/js/widget.multiselect.js'
     ],
     static: [
         './web-src/css/*.css',
@@ -32,7 +33,7 @@ var paths = {
         'src': './web-src/js/services*.js',
         'name': 'services.js'
     }, {
-        'src': './web-src/js/controllers*.js',
+        'src': ['./web-src/js/controllers*.js','./web-src/js/widget.multiselect.js'],
         'name': 'controllers.js'
     }, {
         'src': [
@@ -67,6 +68,9 @@ var paths = {
         ],
         'name': 'jquery-ui.js'
     }],
+    JSMisc: [
+        './node_modules/eventsource-polyfill/dist/eventsource.js'  
+    ],
     CSSLibs: [
         './node_modules/bootstrap/dist/css/bootstrap.min.css',
         './node_modules/angular-material/angular-material.min.css',
@@ -78,7 +82,7 @@ var paths = {
 };
 
 gulp.task('default', ['build','inject']);
-gulp.task('build', ['uglify', 'concat', 'copyCSSLibs', 'copyFontLibs', 'copyJSLibs', 'copyJQUI', 'copyStatic', 'copyPartials']);
+gulp.task('build', ['uglify', 'concat', 'copyCSSLibs', 'copyFontLibs', 'copyJSLibs', 'copyJQUI', 'copyJSMisc', 'copyStatic', 'copyPartials']);
 
 gulp.task('uglify', function () {
     return gulp.src(paths.scripts)
@@ -114,6 +118,16 @@ gulp.task('copyJQUI', function() {
             .pipe(uglify())
             .pipe(gulp.dest('./web/js'));
     });
+});
+
+gulp.task('copyJSMisc', function () {
+    return gulp.src(paths.JSMisc)
+        .pipe(rename(function (path) {
+                path.basename += '.min';
+                return path;
+            }))
+        .pipe(uglify())
+        .pipe(gulp.dest('./web/js'));
 });
 
 gulp.task('copyCSSLibs', function () {
@@ -152,7 +166,7 @@ function browserSyncInit(baseDir) {
         index: "index.html"
     };
 
-    server.middleware = proxyMiddleware(['/rest','/icon'], {target: 'http://localhost:8080'});
+    server.middleware = proxyMiddleware(['/rest','/icon','/audio'], {target: 'http://localhost:8080'});
 
     browserSync.instance = browserSync.init({
         startPath: '/',
@@ -188,6 +202,7 @@ gulp.task('inject', ['build'], function () {
                      './web-src/js/app.js',
                      './web-src/js/constants.js',
                      './web-src/js/controllers.configuration.js',
+                     './web-src/js/controllers.system.js',
                      './web-src/js/controllers.items.js',
                      './web-src/js/controllers.control.js',
                      './web-src/js/controllers.extension.js',
@@ -217,4 +232,12 @@ gulp.task('inject', ['build'], function () {
     }))
       .pipe(isDevelopment ? gulp.dest('./web-src'):gulp.dest('./web'));
   });
+
+gulp.task('test',['build'], function (done) {
+    return new Server({
+      configFile: __dirname + '/karma.conf.js',
+      singleRun: true
+    }, done).start();
+  });
+
 

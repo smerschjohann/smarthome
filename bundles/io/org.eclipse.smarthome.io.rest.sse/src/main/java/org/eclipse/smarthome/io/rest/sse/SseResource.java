@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.annotation.security.RolesAllowed;
 import javax.inject.Singleton;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -24,6 +25,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 
+import org.eclipse.smarthome.core.auth.Role;
 import org.eclipse.smarthome.core.events.Event;
 import org.eclipse.smarthome.io.rest.sse.internal.SseEventOutput;
 import org.eclipse.smarthome.io.rest.sse.internal.util.SseUtil;
@@ -45,11 +47,14 @@ import io.swagger.annotations.ApiResponses;
  *
  */
 @Path(SseResource.PATH_EVENTS)
+@RolesAllowed({ Role.USER })
 @Singleton
 @Api(value = SseResource.PATH_EVENTS, hidden = true)
 public class SseResource {
 
     public final static String PATH_EVENTS = "events";
+
+    private static final String X_ACCEL_BUFFERING_HEADER = "X-Accel-Buffering";
 
     private final SseBroadcaster broadcaster;
 
@@ -95,6 +100,10 @@ public class SseResource {
         // the given filter
         final EventOutput eventOutput = new SseEventOutput(eventFilter);
         broadcaster.add(eventOutput);
+
+        // Disables proxy buffering when using an nginx http server proxy for this response.
+        // This allows you to not disable proxy buffering in nginx and still have working sse
+        response.addHeader(X_ACCEL_BUFFERING_HEADER, "no");
 
         if (!SseUtil.SERVLET3_SUPPORT) {
             // if we don't have sevlet 3.0 async support, we want to make sure

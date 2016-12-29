@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,6 +11,7 @@ import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.thing.Channel;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.binding.builder.ChannelBuilder;
+import org.eclipse.smarthome.core.thing.type.ChannelKind;
 import org.eclipse.smarthome.core.thing.type.ChannelTypeUID;
 
 /**
@@ -30,7 +31,7 @@ public class ChannelDTOMapper {
     public static ChannelDTO map(Channel channel) {
         ChannelTypeUID channelTypeUID = channel.getChannelTypeUID();
         String channelTypeUIDValue = channelTypeUID != null ? channelTypeUID.toString() : null;
-        return new ChannelDTO(channel.getUID(), channelTypeUIDValue, channel.getAcceptedItemType().toString(),
+        return new ChannelDTO(channel.getUID(), channelTypeUIDValue, channel.getAcceptedItemType(), channel.getKind(),
                 channel.getLabel(), channel.getDescription(), channel.getProperties(), channel.getConfiguration(),
                 channel.getDefaultTags());
     }
@@ -47,6 +48,6 @@ public class ChannelDTOMapper {
         return ChannelBuilder.create(channelUID, channelDTO.itemType)
                 .withConfiguration(new Configuration(channelDTO.configuration)).withLabel(channelDTO.label)
                 .withDescription(channelDTO.description).withProperties(channelDTO.properties).withType(channelTypeUID)
-                .withDefaultTags(channelDTO.defaultTags).build();
+                .withDefaultTags(channelDTO.defaultTags).withKind(ChannelKind.parse(channelDTO.kind)).build();
     }
 }

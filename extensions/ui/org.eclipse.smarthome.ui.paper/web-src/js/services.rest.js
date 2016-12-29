@@ -13,7 +13,7 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
         getAll : {
             method : 'GET',
             isArray : true,
-            url : restConfig.restPath + '/items?recursive=true'
+            url : restConfig.restPath + '/items?recursive=false'
         },
         getByName : {
             method : 'GET',
@@ -34,7 +34,14 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             params : {
                 itemName : '@itemName'
             },
-            url : restConfig.restPath + '/items/:itemName'
+            url : restConfig.restPath + '/items/:itemName',
+            transformResponse : function(response, headerGetter, status) {
+                var response = angular.fromJson(response);
+                if (status == 405) {
+                    response.customMessage = "Item is not editable.";
+                }
+                return response;
+            }
         },
         updateState : {
             method : 'PUT',
@@ -87,12 +94,7 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
                 tag : '@tag'
             },
             url : restConfig.restPath + '/items/:itemName/tags/:tag'
-        },
-        getNonRecursiveAll : {
-            method : 'GET',
-            isArray : true,
-            url : restConfig.restPath + '/items?recursive=false'
-        },
+        }
     });
 }).factory('bindingService', function($resource, restConfig) {
     return $resource(restConfig.restPath + '/bindings', {}, {
@@ -172,6 +174,11 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             params : {
                 bindingId : '@bindingId'
             },
+            transformResponse : function(data) {
+                return {
+                    timeout : angular.fromJson(data)
+                }
+            },
             url : restConfig.restPath + '/discovery/bindings/:bindingId/scan'
         }
     });
@@ -184,7 +191,7 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
         getByUid : {
             method : 'GET',
             params : {
-                bindingId : '@thingTypeUID'
+                thingTypeUID : '@thingTypeUID'
             },
             url : restConfig.restPath + '/thing-types/:thingTypeUID'
         }
@@ -332,6 +339,13 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             method : 'GET',
             params : {
                 uri : '@uri'
+            },
+            transformResponse : function(response, headerGetter, status) {
+                var response = angular.fromJson(response);
+                if (status == 404) {
+                    response.showError = false;
+                }
+                return response;
             },
             url : restConfig.restPath + '/config-descriptions/:uri'
         },

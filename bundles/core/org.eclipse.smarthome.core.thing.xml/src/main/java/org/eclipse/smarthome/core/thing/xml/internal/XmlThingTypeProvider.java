@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,12 +9,13 @@ package org.eclipse.smarthome.core.thing.xml.internal;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.eclipse.smarthome.core.common.osgi.ServiceBinder.Bind;
 import org.eclipse.smarthome.core.common.osgi.ServiceBinder.Unbind;
@@ -37,6 +38,7 @@ import org.osgi.framework.Bundle;
  * @author Michael Grammling - Initial Contribution
  * @author Dennis Nobel - Added locale support, Added cache for localized thing types
  * @author Ivan Iliev - Added support for system wide channel types
+ * @author Kai Kreuzer - fixed concurrency issues
  */
 public class XmlThingTypeProvider implements ThingTypeProvider {
 
@@ -61,25 +63,33 @@ public class XmlThingTypeProvider implements ThingTypeProvider {
 
         @Override
         public boolean equals(Object obj) {
-            if (this == obj)
+            if (this == obj) {
                 return true;
-            if (obj == null)
+            }
+            if (obj == null) {
                 return false;
-            if (getClass() != obj.getClass())
+            }
+            if (getClass() != obj.getClass()) {
                 return false;
+            }
             LocalizedThingTypeKey other = (LocalizedThingTypeKey) obj;
-            if (!getOuterType().equals(other.getOuterType()))
+            if (!getOuterType().equals(other.getOuterType())) {
                 return false;
+            }
             if (locale == null) {
-                if (other.locale != null)
+                if (other.locale != null) {
                     return false;
-            } else if (!locale.equals(other.locale))
+                }
+            } else if (!locale.equals(other.locale)) {
                 return false;
+            }
             if (uid == null) {
-                if (other.uid != null)
+                if (other.uid != null) {
                     return false;
-            } else if (!uid.equals(other.uid))
+                }
+            } else if (!uid.equals(other.uid)) {
                 return false;
+            }
             return true;
         }
 
@@ -89,14 +99,14 @@ public class XmlThingTypeProvider implements ThingTypeProvider {
 
     }
 
-    private Map<LocalizedThingTypeKey, ThingType> localizedThingTypeCache = new HashMap<>();
+    private Map<LocalizedThingTypeKey, ThingType> localizedThingTypeCache = new ConcurrentHashMap<>();
 
     private Map<Bundle, List<ThingType>> bundleThingTypesMap;
 
     private ThingTypeI18nUtil thingTypeI18nUtil;
 
     public XmlThingTypeProvider() {
-        this.bundleThingTypesMap = new HashMap<>(10);
+        this.bundleThingTypesMap = new ConcurrentHashMap<>(10);
     }
 
     private List<ThingType> acquireThingTypes(Bundle bundle) {
@@ -104,7 +114,7 @@ public class XmlThingTypeProvider implements ThingTypeProvider {
             List<ThingType> thingTypes = this.bundleThingTypesMap.get(bundle);
 
             if (thingTypes == null) {
-                thingTypes = new ArrayList<ThingType>(10);
+                thingTypes = new CopyOnWriteArrayList<ThingType>();
 
                 this.bundleThingTypesMap.put(bundle, thingTypes);
             }
@@ -156,7 +166,13 @@ public class XmlThingTypeProvider implements ThingTypeProvider {
                     thingType.getChannelDefinitions().size());
 
             for (ChannelDefinition channelDefinition : thingType.getChannelDefinitions()) {
-                localizedChannelDefinitions.add(channelDefinition);
+                String channelLabel = this.thingTypeI18nUtil.getChannelLabel(bundle,
+                        channelDefinition.getChannelTypeUID(), channelDefinition.getLabel(), locale);
+                String channelDescription = this.thingTypeI18nUtil.getChannelDescription(bundle,
+                        channelDefinition.getChannelTypeUID(), channelDefinition.getDescription(), locale);
+                localizedChannelDefinitions
+                        .add(new ChannelDefinition(channelDefinition.getId(), channelDefinition.getChannelTypeUID(),
+                                channelDefinition.getProperties(), channelLabel, channelDescription));
             }
 
             List<ChannelGroupDefinition> localizedChannelGroupDefinitions = new ArrayList<>(

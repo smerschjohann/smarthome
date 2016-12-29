@@ -7,15 +7,11 @@
  */
 package org.eclipse.smarthome.automation.internal.core.provider;
 
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Dictionary;
-import java.util.Hashtable;
-import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 import org.eclipse.smarthome.automation.Action;
 import org.eclipse.smarthome.automation.Condition;
@@ -23,7 +19,6 @@ import org.eclipse.smarthome.automation.Trigger;
 import org.eclipse.smarthome.automation.internal.core.provider.i18n.ModuleI18nUtil;
 import org.eclipse.smarthome.automation.internal.core.provider.i18n.ModuleTypeI18nUtil;
 import org.eclipse.smarthome.automation.parser.Parser;
-import org.eclipse.smarthome.automation.parser.ParsingException;
 import org.eclipse.smarthome.automation.type.ActionType;
 import org.eclipse.smarthome.automation.type.CompositeActionType;
 import org.eclipse.smarthome.automation.type.CompositeConditionType;
@@ -36,13 +31,8 @@ import org.eclipse.smarthome.automation.type.ModuleTypeRegistry;
 import org.eclipse.smarthome.automation.type.Output;
 import org.eclipse.smarthome.automation.type.TriggerType;
 import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
-import org.eclipse.smarthome.core.i18n.I18nProvider;
+import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.ServiceReference;
-import org.osgi.framework.ServiceRegistration;
-import org.osgi.util.tracker.ServiceTracker;
-import org.osgi.util.tracker.ServiceTrackerCustomizer;
 
 /**
  * This class is implementation of {@link ModuleTypeProvider}. It serves for providing {@link ModuleType}s by loading
@@ -64,110 +54,43 @@ public class ModuleTypeResourceBundleProvider extends AbstractResourceBundleProv
 
     protected ModuleTypeRegistry moduleTypeRegistry;
 
-    @SuppressWarnings("rawtypes")
-    private ServiceTracker moduleTypesTracker;
-
-    @SuppressWarnings("rawtypes")
-    private ServiceRegistration /* <T> */ mtpReg;
-
-    @SuppressWarnings("rawtypes")
-    private ServiceTracker localizationTracker;
-
     /**
-     * This constructor is responsible for initializing the path to resources and tracking the managing service of the
-     * {@link ModuleType}s.
+     * This constructor is responsible for initializing the path to resources and tracking the
+     * {@link ModuleTypeRegistry}.
      *
      * @param context is the {@code BundleContext}, used for creating a tracker for {@link Parser} services.
      */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public ModuleTypeResourceBundleProvider(BundleContext context) {
-        super(context);
+    public ModuleTypeResourceBundleProvider() {
+        listeners = new LinkedList<ProviderChangeListener<ModuleType>>();
         path = PATH + "/moduletypes/";
-        moduleTypesTracker = new ServiceTracker(context, ModuleTypeRegistry.class.getName(),
-                new ServiceTrackerCustomizer() {
-
-                    @Override
-                    public Object addingService(ServiceReference reference) {
-                        moduleTypeRegistry = (ModuleTypeRegistry) bc.getService(reference);
-                        queue.open();
-                        return moduleTypeRegistry;
-                    }
-
-                    @Override
-                    public void modifiedService(ServiceReference reference, Object service) {
-                    }
-
-                    @Override
-                    public void removedService(ServiceReference reference, Object service) {
-                        moduleTypeRegistry = null;
-                    }
-                });
-        localizationTracker = new ServiceTracker(bc, I18nProvider.class.getName(), new ServiceTrackerCustomizer() {
-
-            @Override
-            public Object addingService(ServiceReference reference) {
-                i18nProvider = (I18nProvider) bc.getService(reference);
-                return i18nProvider;
-            }
-
-            @Override
-            public void modifiedService(ServiceReference reference, Object service) {
-            }
-
-            @Override
-            public void removedService(ServiceReference reference, Object service) {
-                i18nProvider = null;
-            }
-        });
-        localizationTracker.open();
     }
 
     @Override
-    public void setQueue(AutomationResourceBundlesEventQueue queue) {
-        super.setQueue(queue);
-        moduleTypesTracker.open();
+    public Collection<ModuleType> getAll() {
+        return providedObjectsHolder.values();
     }
 
-    /**
-     * This method is inherited from {@link AbstractResourceBundleProvider}. Extends parent's functionality with closing
-     * the {@link #moduleTypesTracker} and sets <code>null</code> to {@link #moduleTypeRegistry}.
-     *
-     * @see AbstractResourceBundleProvider#close()
-     */
     @Override
-    public void close() {
-        if (localizationTracker != null) {
-            localizationTracker.close();
-            localizationTracker = null;
-            i18nProvider = null;
+    public void addProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
+        synchronized (listeners) {
+            listeners.add(listener);
         }
-        if (moduleTypesTracker != null) {
-            moduleTypesTracker.close();
-            moduleTypesTracker = null;
-            moduleTypeRegistry = null;
+    }
+
+    @Override
+    public void removeProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
+        synchronized (listeners) {
+            listeners.remove(listener);
         }
-        if (mtpReg != null) {
-            mtpReg.unregister();
-            mtpReg = null;
-        }
-        super.close();
     }
 
     /**
      * @see ModuleTypeProvider#getModuleType(java.lang.String, java.util.Locale)
      */
+    @SuppressWarnings("unchecked")
     @Override
     public <T extends ModuleType> T getModuleType(String UID, Locale locale) {
-        ModuleType defModuleType = null;
-        synchronized (providedObjectsHolder) {
-            defModuleType = providedObjectsHolder.get(UID);
-        }
-        if (defModuleType != null) {
-            @SuppressWarnings("unchecked")
-            T mt = (T) getPerLocale(defModuleType, locale);
-            return mt;
-        }
-        return null;
+        return (T) getPerLocale(providedObjectsHolder.get(UID), locale);
     }
 
     /**
@@ -176,83 +99,18 @@ public class ModuleTypeResourceBundleProvider extends AbstractResourceBundleProv
     @Override
     public Collection<ModuleType> getModuleTypes(Locale locale) {
         List<ModuleType> moduleTypesList = new ArrayList<ModuleType>();
-        synchronized (providedObjectsHolder) {
-            Iterator<ModuleType> i = providedObjectsHolder.values().iterator();
-            while (i.hasNext()) {
-                ModuleType defModuleType = i.next();
-                if (defModuleType != null) {
-                    ModuleType mt = getPerLocale(defModuleType, locale);
-                    if (mt != null) {
-                        moduleTypesList.add(mt);
-                    }
-                }
-            }
+        for (ModuleType mt : providedObjectsHolder.values()) {
+            moduleTypesList.add(getPerLocale(mt, locale));
         }
         return moduleTypesList;
     }
 
-    /**
-     * @see AbstractResourceBundleProvider#addingService(ServiceReference)
-     */
-    @Override
-    public Object addingService(@SuppressWarnings("rawtypes") ServiceReference reference) {
-        if (reference.getProperty(Parser.PARSER_TYPE).equals(Parser.PARSER_MODULE_TYPE)) {
-            return super.addingService(reference);
-        }
-        return null;
+    protected void setModuleTypeRegistry(ModuleTypeRegistry moduleTypeRegistry) {
+        this.moduleTypeRegistry = moduleTypeRegistry;
     }
 
-    @Override
-    public boolean isReady() {
-        return moduleTypeRegistry != null && queue != null;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    protected Set<ModuleType> importData(Vendor vendor, Parser<ModuleType> parser,
-            InputStreamReader inputStreamReader) {
-        List<String> portfolio = null;
-        if (vendor != null) {
-            synchronized (providerPortfolio) {
-                portfolio = providerPortfolio.get(vendor);
-                if (portfolio == null) {
-                    portfolio = new ArrayList<String>();
-                    providerPortfolio.put(vendor, portfolio);
-                }
-            }
-        }
-        Set<ModuleType> providedObjects = null;
-        try {
-            providedObjects = parser.parse(inputStreamReader);
-        } catch (ParsingException e) {
-            logger.error("ModuleType parsing error!", e);
-        }
-        if (providedObjects != null && !providedObjects.isEmpty()) {
-            Iterator<ModuleType> i = providedObjects.iterator();
-            while (i.hasNext()) {
-                ModuleType providedObject = i.next();
-                if (providedObject != null) {
-                    String uid = providedObject.getUID();
-                    if (checkExistence(uid)) {
-                        continue;
-                    }
-                    if (portfolio != null) {
-                        portfolio.add(uid);
-                    }
-                    synchronized (providedObjectsHolder) {
-                        providedObjectsHolder.put(uid, providedObject);
-                    }
-                }
-            }
-            Dictionary<String, Object> properties = new Hashtable<String, Object>();
-            properties.put(REG_PROPERTY_MODULE_TYPES, providedObjectsHolder.keySet());
-            if (mtpReg == null) {
-                mtpReg = bc.registerService(ModuleTypeProvider.class.getName(), this, properties);
-            } else {
-                mtpReg.setProperties(properties);
-            }
-        }
-        return providedObjects;
+    protected void removeModuleTypeRegistry(ModuleTypeRegistry moduleTypeRegistry) {
+        this.moduleTypeRegistry = null;
     }
 
     /**
@@ -262,13 +120,19 @@ public class ModuleTypeResourceBundleProvider extends AbstractResourceBundleProv
      * @param uid UID of the newly created {@link ModuleType}, which to be checked.
      * @return {@code true} if {@link ModuleType} with the same UID exists or {@code false} in the opposite case.
      */
-    private boolean checkExistence(String uid) {
+    @Override
+    protected boolean checkExistence(String uid) {
         if (moduleTypeRegistry.get(uid) != null) {
             logger.error("Module Type with UID \"{}\" already exists! Failed to create a second with the same UID!",
                     uid, new IllegalArgumentException());
             return true;
         }
         return false;
+    }
+
+    @Override
+    protected String getUID(ModuleType parsedObject) {
+        return parsedObject.getUID();
     }
 
     /**
@@ -279,7 +143,7 @@ public class ModuleTypeResourceBundleProvider extends AbstractResourceBundleProv
      * @return the localized {@link ModuleType}.
      */
     private ModuleType getPerLocale(ModuleType defModuleType, Locale locale) {
-        if (locale == null) {
+        if (locale == null || defModuleType == null || i18nProvider == null) {
             return defModuleType;
         }
         String uid = defModuleType.getUID();
@@ -289,7 +153,7 @@ public class ModuleTypeResourceBundleProvider extends AbstractResourceBundleProv
         String ldescription = ModuleTypeI18nUtil.getLocalizedModuleTypeDescription(i18nProvider, bundle, uid,
                 defModuleType.getDescription(), locale);
         List<ConfigDescriptionParameter> lconfigDescriptions = getLocalizedConfigurationDescription(i18nProvider,
-                defModuleType.getConfigurationDescription(), bundle, uid, ModuleTypeI18nUtil.MODULE_TYPE, locale);
+                defModuleType.getConfigurationDescriptions(), bundle, uid, ModuleTypeI18nUtil.MODULE_TYPE, locale);
         if (defModuleType instanceof ActionType) {
             return createLocalizedActionType((ActionType) defModuleType, bundle, uid, locale, lconfigDescriptions,
                     llabel, ldescription);

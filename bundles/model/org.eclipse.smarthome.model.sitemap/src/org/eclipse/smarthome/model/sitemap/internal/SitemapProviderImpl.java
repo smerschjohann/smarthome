@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -41,14 +41,20 @@ public class SitemapProviderImpl implements SitemapProvider {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see org.eclipse.smarthome.model.sitemap.internal.SitemapProvider#getSitemap(java.lang.String)
      */
     @Override
     public Sitemap getSitemap(String sitemapName) {
         if (modelRepo != null) {
-            Sitemap sitemap = (Sitemap) modelRepo.getModel(sitemapName + ".sitemap");
+            String filename = sitemapName + ".sitemap";
+            Sitemap sitemap = (Sitemap) modelRepo.getModel(filename);
             if (sitemap != null) {
+                if (!sitemap.getName().equals(sitemapName)) {
+                    logger.warn(
+                            "Filename `{}` does not match the name `{}` of the sitemap - please fix this as you might see unexpected behavior otherwise.",
+                            filename, sitemap.getName());
+                }
                 return sitemap;
             } else {
                 logger.trace("Sitemap {} cannot be found", sitemapName);
@@ -64,7 +70,7 @@ public class SitemapProviderImpl implements SitemapProvider {
     public Set<String> getSitemapNames() {
         Set<String> names = new HashSet<>();
         if (modelRepo != null) {
-            for(String name : modelRepo.getAllModelNamesOfType("sitemap")) {
+            for (String name : modelRepo.getAllModelNamesOfType("sitemap")) {
                 names.add(StringUtils.removeEnd(name, SITEMAP_FILEEXT));
             }
         } else {

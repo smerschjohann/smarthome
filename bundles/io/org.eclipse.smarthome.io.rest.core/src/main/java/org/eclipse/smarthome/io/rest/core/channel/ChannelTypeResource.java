@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
@@ -28,12 +29,13 @@ import org.eclipse.smarthome.config.core.dto.ConfigDescriptionDTO;
 import org.eclipse.smarthome.config.core.dto.ConfigDescriptionDTOMapper;
 import org.eclipse.smarthome.config.core.dto.ConfigDescriptionParameterDTO;
 import org.eclipse.smarthome.config.core.dto.ConfigDescriptionParameterGroupDTO;
+import org.eclipse.smarthome.core.auth.Role;
 import org.eclipse.smarthome.core.thing.dto.ChannelTypeDTO;
 import org.eclipse.smarthome.core.thing.type.ChannelType;
 import org.eclipse.smarthome.core.thing.type.ChannelTypeRegistry;
 import org.eclipse.smarthome.core.thing.type.ChannelTypeUID;
 import org.eclipse.smarthome.io.rest.LocaleUtil;
-import org.eclipse.smarthome.io.rest.RESTResource;
+import org.eclipse.smarthome.io.rest.SatisfiableRESTResource;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -47,8 +49,9 @@ import io.swagger.annotations.ApiResponses;
  * @author Chris Jackson - Initial contribution
  */
 @Path(ChannelTypeResource.PATH_CHANNEL_TYPES)
+@RolesAllowed({ Role.ADMIN })
 @Api(value = ChannelTypeResource.PATH_CHANNEL_TYPES)
-public class ChannelTypeResource implements RESTResource {
+public class ChannelTypeResource implements SatisfiableRESTResource {
 
     /** The URI path to this resource */
     public static final String PATH_CHANNEL_TYPES = "channel-types";
@@ -75,7 +78,7 @@ public class ChannelTypeResource implements RESTResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "Gets all available channel types.", response = ChannelTypeDTO.class, responseContainer = "Set")
-    @ApiResponses(value = @ApiResponse(code = 200, message = "OK") )
+    @ApiResponses(value = @ApiResponse(code = 200, message = "OK"))
     public Response getAll(
             @HeaderParam(HttpHeaders.ACCEPT_LANGUAGE) @ApiParam(value = HttpHeaders.ACCEPT_LANGUAGE) String language) {
         Locale locale = LocaleUtil.getLocale(language);
@@ -130,8 +133,8 @@ public class ChannelTypeResource implements RESTResource {
         }
 
         return new ChannelTypeDTO(channelType.getUID().toString(), channelType.getLabel(), channelType.getDescription(),
-                channelType.getCategory(), channelType.getItemType(), parameters, parameterGroups,
-                channelType.getState(), channelType.getTags());
+                channelType.getCategory(), channelType.getItemType(), channelType.getKind(), parameters,
+                parameterGroups, channelType.getState(), channelType.getTags());
     }
 
     private Set<ChannelTypeDTO> convertToChannelTypeDTOs(List<ChannelType> channelTypes, Locale locale) {
@@ -142,5 +145,10 @@ public class ChannelTypeResource implements RESTResource {
         }
 
         return channelTypeDTOs;
+    }
+
+    @Override
+    public boolean isSatisfied() {
+        return channelTypeRegistry != null && configDescriptionRegistry != null;
     }
 }

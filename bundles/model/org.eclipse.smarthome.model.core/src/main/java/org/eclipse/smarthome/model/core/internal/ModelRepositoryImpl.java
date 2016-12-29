@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -81,6 +81,8 @@ public class ModelRepositoryImpl implements ModelRepository {
                 resource = getResource(name);
                 if (resource == null) {
                     // seems to be a new file
+                    // don't use XMI as a default
+                    Resource.Factory.Registry.INSTANCE.getExtensionToFactoryMap().remove("*");
                     resource = resourceSet.createResource(URI.createURI(name));
                     if (resource != null) {
                         logger.info("Loading model '{}'", name);
@@ -100,6 +102,8 @@ public class ModelRepositoryImpl implements ModelRepository {
                             logger.warn("Configuration model '" + name + "' cannot be parsed correctly!", e);
                             resourceSet.getResources().remove(resource);
                         }
+                    } else {
+                        logger.warn("Ignoring file '{}' as we do not have a parser for it.", name);
                     }
                 }
             }
@@ -175,7 +179,9 @@ public class ModelRepositoryImpl implements ModelRepository {
                         // It's not sufficient to discard the derived state.
                         // The quick & dirts solution is to reparse the whole resource.
                         // We trigger this by dummy updating the resource.
+                        logger.debug("Refreshing resource '{}'", resource.getURI().lastSegment());
                         xtextResource.update(1, 0, "");
+                        notifyListeners(resource.getURI().lastSegment(), EventType.MODIFIED);
                     }
                 }
             }

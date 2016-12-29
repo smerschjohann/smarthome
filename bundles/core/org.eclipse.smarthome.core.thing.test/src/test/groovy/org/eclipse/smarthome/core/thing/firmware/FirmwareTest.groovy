@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Deutsche Telekom AG and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,7 +14,7 @@ import static org.junit.matchers.JUnitMatchers.*
 
 import org.eclipse.smarthome.core.thing.ThingTypeUID
 import org.eclipse.smarthome.core.thing.binding.firmware.Firmware
-import org.eclipse.smarthome.core.thing.binding.firmware.FirmwareUID;
+import org.eclipse.smarthome.core.thing.binding.firmware.FirmwareUID
 import org.eclipse.smarthome.test.OSGiTest
 import org.junit.Test
 
@@ -55,6 +55,11 @@ final class FirmwareTest extends OSGiTest {
     Firmware v1dash11dot2_1 = new Firmware.Builder(new FirmwareUID(thingTypeUID, "1-11.2_1")).build()
     Firmware v1dot11_2dasha = new Firmware.Builder(new FirmwareUID(thingTypeUID, "1.11_2-a")).build()
     Firmware v2dot0dot0 = new Firmware.Builder(new FirmwareUID(thingTypeUID, "2.0.0")).withPrerequisiteVersion(v1dot11_2dasha.getVersion()).build()
+
+    Firmware combined1 = new Firmware.Builder(new FirmwareUID(thingTypeUID, "1.2.3-2.3.4")).build()
+    Firmware combined2 = new Firmware.Builder(new FirmwareUID(thingTypeUID, "1.2.3-2.4.1")).build()
+    Firmware combined3 = new Firmware.Builder(new FirmwareUID(thingTypeUID, "1.3.1-2.3.4")).build()
+    Firmware combined4 = new Firmware.Builder(new FirmwareUID(thingTypeUID, "1.3.1-2.4.1")).build()
 
     @Test
     void 'test builder'() {
@@ -128,34 +133,43 @@ final class FirmwareTest extends OSGiTest {
         assertThat vdelta.isSuccessorVersion(vgamma.getVersion()), is(false)
 
         assertThat vdelta.isSuccessorVersion(null), is(false)
+
+        assertThat combined4.isSuccessorVersion(combined3.getVersion()), is(true)
+        assertThat combined3.isSuccessorVersion(combined4.getVersion()), is(false)
+
+        assertThat combined3.isSuccessorVersion(combined2.getVersion()), is(true)
+        assertThat combined2.isSuccessorVersion(combined3.getVersion()), is(false)
+
+        assertThat combined2.isSuccessorVersion(combined1.getVersion()), is(true)
+        assertThat combined1.isSuccessorVersion(combined2.getVersion()), is(false)
     }
 
     @Test
     void 'test firmware prerequisite version'() {
-        assertThat valpha.isPrerequisteVersion(vbeta.getVersion()), is(false)
-        assertThat valpha.isPrerequisteVersion(null), is(false)
+        assertThat valpha.isPrerequisiteVersion(vbeta.getVersion()), is(false)
+        assertThat valpha.isPrerequisiteVersion(null), is(false)
 
-        assertThat vbeta.isPrerequisteVersion(valpha1.getVersion()), is(true)
-        assertThat vbeta.isPrerequisteVersion(valpha.getVersion()), is(false)
+        assertThat vbeta.isPrerequisiteVersion(valpha1.getVersion()), is(true)
+        assertThat vbeta.isPrerequisiteVersion(valpha.getVersion()), is(false)
 
-        assertThat vgamma.isPrerequisteVersion(vbetafix.getVersion()), is(true)
-        assertThat vgamma.isPrerequisteVersion(vbeta.getVersion()), is(false)
+        assertThat vgamma.isPrerequisiteVersion(vbetafix.getVersion()), is(true)
+        assertThat vgamma.isPrerequisiteVersion(vbeta.getVersion()), is(false)
 
-        assertThat vdelta.isPrerequisteVersion(vgamma.getVersion()), is(false)
+        assertThat vdelta.isPrerequisiteVersion(vgamma.getVersion()), is(false)
 
-        assertThat v1dot0dot2.isPrerequisteVersion(v1dot0dot1.getVersion()), is(true)
-        assertThat v1dot0dot2.isPrerequisteVersion(v1dot0dot0.getVersion()), is(false)
-        assertThat v1dot0dot2.isPrerequisteVersion(v0dot0dot9.getVersion()), is(false)
+        assertThat v1dot0dot2.isPrerequisiteVersion(v1dot0dot1.getVersion()), is(true)
+        assertThat v1dot0dot2.isPrerequisiteVersion(v1dot0dot0.getVersion()), is(false)
+        assertThat v1dot0dot2.isPrerequisiteVersion(v0dot0dot9.getVersion()), is(false)
 
-        assertThat v1dot1dot0.isPrerequisteVersion(v1dash1.getVersion()), is(true)
-        assertThat v1dot1dot0.isPrerequisteVersion(v1dot0dot3.getVersion()), is(true)
-        assertThat v1dot1dot0.isPrerequisteVersion(v1dot0dot2dashfix.getVersion()), is(true)
-        assertThat v1dot1dot0.isPrerequisteVersion(v1dot0dot2.getVersion()), is(false)
-        assertThat v1dot1dot0.isPrerequisteVersion(v1dot0dot1.getVersion()), is(false)
-        assertThat v1dot1dot0.isPrerequisteVersion(v0dot0dot9.getVersion()), is(false)
+        assertThat v1dot1dot0.isPrerequisiteVersion(v1dash1.getVersion()), is(true)
+        assertThat v1dot1dot0.isPrerequisiteVersion(v1dot0dot3.getVersion()), is(true)
+        assertThat v1dot1dot0.isPrerequisiteVersion(v1dot0dot2dashfix.getVersion()), is(true)
+        assertThat v1dot1dot0.isPrerequisiteVersion(v1dot0dot2.getVersion()), is(false)
+        assertThat v1dot1dot0.isPrerequisiteVersion(v1dot0dot1.getVersion()), is(false)
+        assertThat v1dot1dot0.isPrerequisiteVersion(v0dot0dot9.getVersion()), is(false)
 
-        assertThat v2dot0dot0.isPrerequisteVersion(v1dot11_2dasha.getVersion()), is(true)
-        assertThat v2dot0dot0.isPrerequisteVersion(v1dash11dot2_1.getVersion()), is(false)
+        assertThat v2dot0dot0.isPrerequisiteVersion(v1dot11_2dasha.getVersion()), is(true)
+        assertThat v2dot0dot0.isPrerequisiteVersion(v1dash11dot2_1.getVersion()), is(false)
     }
 
     @Test(expected=IllegalArgumentException)

@@ -1,11 +1,10 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-
 package org.eclipse.smarthome.core.library.types;
 
 import java.math.BigDecimal;
@@ -157,6 +156,11 @@ public class PointType implements ComplexType, Command, State {
 
     @Override
     public String toString() {
+        return toFullString();
+    }
+
+    @Override
+    public String toFullString() {
         StringBuilder sb = new StringBuilder(latitude.toPlainString());
         sb.append(',');
         sb.append(longitude.toPlainString());

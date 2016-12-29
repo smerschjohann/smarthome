@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -15,7 +15,6 @@ import java.util.Set;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.ChannelUID;
-import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.binding.BaseBridgeHandler;
 import org.eclipse.smarthome.core.types.Command;
@@ -48,12 +47,6 @@ public class WemoBridgeHandler extends BaseBridgeHandler {
         if (configuration.get(UDN) != null) {
             logger.trace("Initializing WemoBridgeHandler for UDN '{}'", configuration.get(UDN));
             super.initialize();
-
-            Bridge bridge = this.getThing();
-            for (Thing thing : bridge.getThings()) {
-                ((WemoLightHandler) thing.getHandler()).bridgeHandlerInitialized(this, bridge);
-            }
-
         } else {
             logger.debug("Cannot initalize WemoBridgeHandler. UDN not set.");
         }

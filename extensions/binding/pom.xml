@@ -20,10 +20,13 @@
     <module>org.eclipse.smarthome.binding.hue</module>
     <module>org.eclipse.smarthome.binding.hue.test</module>
     <module>org.eclipse.smarthome.binding.fsinternetradio</module>
+    <module>org.eclipse.smarthome.binding.fsinternetradio.test</module>
     <module>org.eclipse.smarthome.binding.lifx</module>
     <module>org.eclipse.smarthome.binding.ntp</module>
+    <module>org.eclipse.smarthome.binding.ntp.test</module>
     <module>org.eclipse.smarthome.binding.sonos</module>
     <module>org.eclipse.smarthome.binding.wemo</module>
+    <module>org.eclipse.smarthome.binding.wemo.test</module>
     <module>org.eclipse.smarthome.binding.yahooweather</module>
   </modules>
 

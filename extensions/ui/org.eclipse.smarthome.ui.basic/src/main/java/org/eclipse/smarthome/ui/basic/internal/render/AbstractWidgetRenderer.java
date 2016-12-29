@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -73,6 +73,31 @@ abstract public class AbstractWidgetRenderer implements WidgetRenderer {
     }
 
     /**
+     * Replace some common values in the widget template
+     *
+     * @param snippet snippet html code
+     * @param w corresponding widget
+     * @return
+     */
+    protected String preprocessSnippet(String snippet, Widget w) {
+        snippet = StringUtils.replace(snippet, "%widget_id%", itemUIRegistry.getWidgetId(w));
+        snippet = StringUtils.replace(snippet, "%icon_type%", config.getIconType());
+        snippet = StringUtils.replace(snippet, "%item%", w.getItem() != null ? w.getItem() : "");
+        snippet = StringUtils.replace(snippet, "%label%", getLabel(w));
+        snippet = StringUtils.replace(snippet, "%value%", getValue(w));
+        snippet = StringUtils.replace(snippet, "%visibility_class%",
+                itemUIRegistry.getVisiblity(w) ? "" : "mdl-form__row--hidden");
+
+        String state = getState(w);
+        snippet = StringUtils.replace(snippet, "%state%", state == null ? "" : escapeURL(state));
+
+        String category = getCategory(w);
+        snippet = StringUtils.replace(snippet, "%category%", escapeURL(category));
+
+        return snippet;
+    }
+
+    /**
      * This method provides the html snippet for a given elementType of the sitemap model.
      *
      * @param elementType the name of the model type (e.g. "Group" or "Switch")
@@ -141,6 +166,10 @@ abstract public class AbstractWidgetRenderer implements WidgetRenderer {
      * @return The escaped string
      */
     protected String escapeURL(String string) {
+        if (string == null) {
+            return null;
+        }
+
         try {
             return URLEncoder.encode(string, "UTF-8");
         } catch (UnsupportedEncodingException use) {
@@ -181,14 +210,13 @@ abstract public class AbstractWidgetRenderer implements WidgetRenderer {
     }
 
     protected String getCategory(Widget w) {
-        String category = escapeURL(itemUIRegistry.getCategory(w));
-        return category;
+        return itemUIRegistry.getCategory(w);
     }
 
     protected String getState(Widget w) {
         State state = itemUIRegistry.getState(w);
         if (state != null) {
-            return escapeURL(state.toString());
+            return state.toString();
         } else {
             return "NULL";
         }

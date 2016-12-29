@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -40,13 +40,8 @@ public class TextRenderer extends AbstractWidgetRenderer {
         Text text = (Text) w;
         String snippet = (text.getChildren().size() > 0) ? getSnippet("text_link") : getSnippet("text");
 
+        snippet = preprocessSnippet(snippet, w);
         snippet = StringUtils.replace(snippet, "%id%", itemUIRegistry.getWidgetId(w));
-        snippet = StringUtils.replace(snippet, "%category%", getCategory(w));
-        snippet = StringUtils.replace(snippet, "%icon_type%", config.getIconType());
-        snippet = StringUtils.replace(snippet, "%state%", getState(w));
-        snippet = StringUtils.replace(snippet, "%label%", getLabel(w));
-        snippet = StringUtils.replace(snippet, "%value%", getValue(w));
-        snippet = StringUtils.replace(snippet, "%item%", w.getItem());
 
         // Process the color tags
         snippet = processColor(w, snippet);

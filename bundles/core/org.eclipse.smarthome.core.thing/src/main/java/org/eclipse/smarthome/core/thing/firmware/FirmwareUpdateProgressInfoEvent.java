@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Deutsche Telekom AG and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -103,8 +103,9 @@ public final class FirmwareUpdateProgressInfoEvent extends AbstractEvent {
 
     @Override
     public String toString() {
-        return String.format("The firmware update progress step for thing %s changed to %s.", thingUID,
-                progressInfo.getProgressStep().name());
+        String stepName = progressInfo.getProgressStep() == null ? null : progressInfo.getProgressStep().name();
+        return String.format("The firmware update progress for thing %s changed. Step: %s Progress: %d.", thingUID,
+                stepName, progressInfo.getProgress());
     }
 
 }

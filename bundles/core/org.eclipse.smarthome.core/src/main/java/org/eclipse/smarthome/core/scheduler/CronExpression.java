@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -169,7 +169,23 @@ public final class CronExpression extends AbstractExpression<CronExpressionPart>
      * @throws ParseException if the string expression cannot be parsed into a valid <code>CronExpression</code>.
      */
     public CronExpression(final String expression, final Date startTime, final TimeZone zone) throws ParseException {
-        super(expression, " \t", startTime, zone, 10);
+        super(expression, " \t", startTime, zone, 0, 1);
+    }
+
+    @Override
+    public void setStartDate(Date startDate) throws IllegalArgumentException, ParseException {
+        if (startDate == null) {
+            throw new IllegalArgumentException("The start date of the rule can not be null");
+        }
+
+        // We set the real start date to the next second; milliseconds are not supported by cron expressions anyways
+        Calendar calendar = Calendar.getInstance(getTimeZone());
+        calendar.setTime(startDate);
+        if (calendar.get(Calendar.MILLISECOND) != 0) {
+            calendar.add(Calendar.SECOND, 1);
+            calendar.set(Calendar.MILLISECOND, 0);
+        }
+        super.setStartDate(calendar.getTime());
     }
 
     @Override
@@ -1192,5 +1208,10 @@ public final class CronExpression extends AbstractExpression<CronExpressionPart>
             candidates.addAll(newCandidates);
             return candidates;
         }
+    }
+
+    @Override
+    public boolean hasFloatingStartDate() {
+        return true;
     }
 }

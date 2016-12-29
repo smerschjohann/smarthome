@@ -1,4 +1,4 @@
-angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control', 'PaperUI.controllers.setup', 'PaperUI.controllers.configuration', 'PaperUI.controllers.extension', 'PaperUI.controllers.rules', 'PaperUI.services', 'PaperUI.services.rest', 'PaperUI.services.repositories', 'PaperUI.extensions', 'ngRoute', 'ngResource', 'ngMaterial', 'ngMessages', 'ngSanitize', 'ui.sortable' ]).config([ '$routeProvider', '$httpProvider', 'globalConfig', '$mdDateLocaleProvider', function($routeProvider, httpProvider, globalConfig, $mdDateLocaleProvider) {
+angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control', 'PaperUI.controllers.setup', 'PaperUI.controllers.configuration', 'PaperUI.controllers.extension', 'PaperUI.controllers.rules', 'PaperUI.services', 'PaperUI.services.rest', 'PaperUI.services.repositories', 'PaperUI.extensions', 'ngRoute', 'ngResource', 'ngMaterial', 'ngMessages', 'ngSanitize', 'ui.sortable' ]).config([ '$routeProvider', '$httpProvider', 'globalConfig', '$mdDateLocaleProvider', 'moduleConfig', function($routeProvider, httpProvider, globalConfig, $mdDateLocaleProvider, moduleConfig) {
     $routeProvider.when('/control', {
         templateUrl : 'partials/control.html',
         controller : 'ControlPageController',
@@ -13,14 +13,6 @@ angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control'
     }).when('/inbox/search', {
         templateUrl : 'partials/setup.html',
         controller : 'SetupWizardController',
-        title : 'Inbox'
-    }).when('/inbox/manual-setup/choose', {
-        templateUrl : 'partials/setup.html',
-        controller : 'ManualSetupChooseController',
-        title : 'Inbox'
-    }).when('/inbox/manual-setup/configure/:thingTypeUID', {
-        templateUrl : 'partials/setup.html',
-        controller : 'ManualSetupConfigureController',
         title : 'Inbox'
     }).when('/inbox/setup/bindings', {
         templateUrl : 'partials/setup.html',
@@ -71,19 +63,19 @@ angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control'
         templateUrl : 'partials/configuration.html',
         controller : 'ConfigurationPageController',
         title : 'Configuration'
+    }).when('/configuration/system', {
+        templateUrl : 'partials/system.configuration.html',
+        controller : 'ConfigurationPageController',
+        title : 'Configuration'
     }).when('/extensions', {
         templateUrl : 'partials/extensions.html',
         controller : 'ExtensionPageController',
-        title : 'Extensions'
+        title : moduleConfig.extensions && moduleConfig.extensions.hasOwnProperty('label') && moduleConfig.extensions['label'] ? moduleConfig.extensions['label'] : 'Extensions'
     }).when('/rules', {
         templateUrl : 'partials/rules.html',
         controller : 'RulesPageController',
         title : 'Rules'
     }).when('/rules/new', {
-        templateUrl : 'partials/rules.html',
-        controller : 'RulesPageController',
-        title : 'Rules'
-    }).when('/rules/view/:ruleUID', {
         templateUrl : 'partials/rules.html',
         controller : 'RulesPageController',
         title : 'Rules'
@@ -149,16 +141,13 @@ angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control'
         require : 'ngModel',
         link : function(scope, element, attrs, ngModel) {
 
-            element[0].addEventListener('click', function() {
-                scope.$watch(attrs.ngModel, function(value) {
-                    if ((value === undefined || value == "") && attrs.isrequired) {
-                        element.addClass('border-invalid');
-                    } else {
-                        element.removeClass('border-invalid');
-                    }
-                });
+            scope.$watch(attrs.ngModel, function(value) {
+                if ((value === undefined || value === "") && attrs.isrequired == "true") {
+                    element.addClass('border-invalid');
+                } else {
+                    element.removeClass('border-invalid');
+                }
             });
-
         }
     };
 }).directive('customFocus', function() {
@@ -180,6 +169,7 @@ angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control'
 
         }
     };
+
 }).directive('colorSelect', function() {
     return {
         restrict : 'A',
@@ -187,7 +177,9 @@ angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control'
         link : function(scope, element, attrs, ngModel) {
 
             element[0].addEventListener('click', function() {
-                scope.configuration[scope.parameter.name] = "#ffffff";
+                if (!scope.configuration[scope.parameter.name]) {
+                    scope.configuration[scope.parameter.name] = "#ffffff";
+                }
             });
 
         }
@@ -202,7 +194,107 @@ angular.module('PaperUI', [ 'PaperUI.controllers', 'PaperUI.controllers.control'
                 scope.configuration[scope.parameter.name] = undefined;
                 scope.$apply();
             });
+        }
+    };
+}).directive('dayOfWeek', function() {
+    return {
+        restrict : 'A',
+        link : function(scope, element, attrs, ngModel) {
+            if (element[0] && element[0].children && element[0].children.length > 1) {
+                if (!scope.configuration[scope.parameter.name]) {
+                    scope.configuration[scope.parameter.name] = attrs.multi == "true" ? [] : "";
+                    if (attrs.ngRequired == "true") {
+                        $(element[0]).addClass('border-invalid');
+                    }
+                }
+                for (var nodeIndex = 0; nodeIndex < element[0].children.length; nodeIndex++) {
+                    if (scope.configuration[scope.parameter.name].indexOf(element[0].children[nodeIndex].value) != -1) {
+                        $(element[0].children[nodeIndex]).addClass('dow-selected');
+                    }
+                    element[0].children[nodeIndex].addEventListener('click', function(event) {
+                        $(element[0]).removeClass('border-invalid');
+                        if (attrs.multi == "true") {
+                            var index = scope.configuration[scope.parameter.name].indexOf(event.target.value)
+                            if (index == -1) {
+                                scope.configuration[scope.parameter.name].push(event.target.value);
+                                $(event.target).addClass('dow-selected');
+                            } else {
+                                scope.configuration[scope.parameter.name].splice(index, 1);
+                                $(event.target).removeClass('dow-selected');
+                                if (attrs.ngRequired && scope.configuration[scope.parameter.name].length == 0) {
+                                    $(element[0]).addClass('border-invalid');
+                                }
+                            }
+                        } else {
+                            if (scope.configuration[scope.parameter.name] == "" || scope.configuration[scope.parameter.name] != event.target.value) {
+                                if (scope.configuration[scope.parameter.name] != event.target.value) {
+                                    $(element[0].children).removeClass('dow-selected');
+                                }
+                                scope.configuration[scope.parameter.name] = event.target.value;
+                                $(event.target).addClass('dow-selected');
+                            } else {
+                                scope.configuration[scope.parameter.name] = "";
+                                $(event.target).removeClass('dow-selected');
+                                if (attrs.ngRequired == "true") {
+                                    $(element[0]).addClass('border-invalid');
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    };
+}).directive('copyclipboard', function(toastService) {
+    return {
+        restrict : 'A',
+        link : function(scope, element, attrs) {
+            element[0].addEventListener('click', function() {
+                var input = document.createElement("input");
+                input.value = attrs.copyclipboard;
+                var body = document.getElementsByTagName('body')[0];
+                body.appendChild(input);
+                input.select();
+                var isCopied = document.execCommand('copy');
+                if (isCopied) {
+                    toastService.showDefaultToast('Text copied to clipboard');
+                } else {
+                    toastService.showDefaultToast('Could not copy to clipboard');
+                }
+                body.removeChild(input);
+            });
+        }
+    };
+}).directive('longPress', function($timeout) {
+    return {
+        restrict : 'A',
+        link : function($scope, elem, $attrs) {
+            var timeoutHandler;
+            var longClicked = false;
+            elem[0].addEventListener('mousedown', function(evt) {
+                timeoutHandler = $timeout(function() {
+                    longClicked = true;
+                    if ($attrs.onLongPress) {
+                        $scope.$apply(function() {
+                            $scope.$eval($attrs.onLongPress, {
+                                $event : evt
+                            });
+                        });
+                    }
+                }, 400)
+            });
 
+            elem[0].addEventListener('mouseup', function(evt) {
+                $timeout.cancel(timeoutHandler);
+                if (!longClicked && $attrs.onClick) {
+                    $scope.$apply(function() {
+                        $scope.$eval($attrs.onClick, {
+                            $event : evt
+                        });
+                    });
+                }
+                longClicked = false;
+            });
         }
     };
 }).run([ '$location', '$rootScope', 'globalConfig', function($location, $rootScope, globalConfig) {

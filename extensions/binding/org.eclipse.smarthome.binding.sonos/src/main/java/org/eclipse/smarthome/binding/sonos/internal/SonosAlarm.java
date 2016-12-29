@@ -1,6 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
- *
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,17 +7,15 @@
  */
 package org.eclipse.smarthome.binding.sonos.internal;
 
-import java.util.Calendar;
-import java.util.Date;
-
 /**
  * The {@link SonosAlarm} is a datastructure to describe
  * alarms in the Sonos ecosystem
- * 
+ *
  * @author Karel Goderis - Initial contribution
  */
 public class SonosAlarm implements Cloneable {
 
+    @Override
     public Object clone() {
         try {
             return super.clone();

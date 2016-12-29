@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) 2014-2016 by the respective copyright holders.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v10.html
+ */
 package org.eclipse.smarthome.core.scheduler;
 
 import static org.junit.Assert.assertEquals;
@@ -7,7 +14,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
-import org.eclipse.smarthome.core.scheduler.DateExpression;
 import org.junit.Test;
 
 public class DateExpressionTest {
@@ -22,6 +28,7 @@ public class DateExpressionTest {
 
         Calendar cal = Calendar.getInstance();
         cal.set(2016, 0, 1, 0, 0, 0); // set to Jan 1st 2016, 00:00
+        cal.set(Calendar.MILLISECOND, 0);
         cal.setTimeZone(TimeZone.getTimeZone("GMT+00"));
         Date startDate = cal.getTime();
 
@@ -45,6 +52,7 @@ public class DateExpressionTest {
 
         Calendar cal = Calendar.getInstance();
         cal.set(2016, 0, 1, 0, 0, 0); // set to Jan 1st 2016, 00:00
+        cal.set(Calendar.MILLISECOND, 0);
         cal.setTimeZone(TimeZone.getTimeZone("GMT+00"));
         Date startDate = cal.getTime();
 

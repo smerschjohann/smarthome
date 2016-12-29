@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -58,12 +58,9 @@ public class SelectionRenderer extends AbstractWidgetRenderer {
     public EList<Widget> renderWidget(Widget w, StringBuilder sb) throws RenderException {
         String snippet = getSnippet("selection");
 
-        snippet = StringUtils.replace(snippet, "%category%", getCategory(w));
-        snippet = StringUtils.replace(snippet, "%icon_type%", config.getIconType());
-        snippet = StringUtils.replace(snippet, "%state%", getState(w));
+        snippet = preprocessSnippet(snippet, w);
         snippet = StringUtils.replace(snippet, "%value_map%", getMappingsJSON((Selection) w));
         snippet = StringUtils.replace(snippet, "%label_header%", getLabel(w));
-        snippet = StringUtils.replace(snippet, "%item%", w.getItem() != null ? w.getItem() : "");
 
         String state = itemUIRegistry.getState(w).toString();
         Selection selection = (Selection) w;
@@ -86,7 +83,7 @@ public class SelectionRenderer extends AbstractWidgetRenderer {
             rowSB.append(rowSnippet);
         }
         snippet = StringUtils.replace(snippet, "%rows%", rowSB.toString());
-        snippet = StringUtils.replace(snippet, "%value%", mappingLabel != null ? mappingLabel : "");
+        snippet = StringUtils.replace(snippet, "%value_header%", mappingLabel != null ? mappingLabel : "");
 
         // Process the color tags
         snippet = processColor(w, snippet);

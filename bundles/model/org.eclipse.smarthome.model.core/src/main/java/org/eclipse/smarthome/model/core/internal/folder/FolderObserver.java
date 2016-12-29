@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,9 +7,7 @@
  */
 package org.eclipse.smarthome.model.core.internal.folder;
 
-import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
-import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
+import static java.nio.file.StandardWatchEventKinds.*;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -17,9 +15,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchEvent.Kind;
+import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.Dictionary;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -36,6 +36,7 @@ import org.apache.commons.lang.StringUtils;
 import org.eclipse.smarthome.config.core.ConfigConstants;
 import org.eclipse.smarthome.core.service.AbstractWatchQueueReader;
 import org.eclipse.smarthome.core.service.AbstractWatchService;
+import org.eclipse.smarthome.model.core.ModelParser;
 import org.eclipse.smarthome.model.core.ModelRepository;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
@@ -59,6 +60,12 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
     /* map that stores a list of valid file extensions for each folder */
     private final Map<String, String[]> folderFileExtMap = new ConcurrentHashMap<String, String[]>();
 
+    /* set of file extensions for which we have parsers already registered */
+    private static Set<String> parsers = new HashSet<>();
+
+    /* set of files that have been ignored due to a missing parser */
+    private static Set<File> ignoredFiles = new HashSet<>();
+
     public void setModelRepository(ModelRepository modelRepo) {
         this.modelRepo = modelRepo;
     }
@@ -67,13 +74,33 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
         this.modelRepo = null;
     }
 
+    protected void addModelParser(ModelParser modelParser) {
+        parsers.add(modelParser.getExtension());
+        processIgnoredFiles(modelParser.getExtension());
+    }
+
+    protected void removeModelParser(ModelParser modelParser) {
+        parsers.remove(modelParser.getExtension());
+    }
+
     @Override
     public void activate() {
     }
 
+    private void processIgnoredFiles(String extension) {
+        HashSet<File> clonedSet = new HashSet<>(ignoredFiles);
+        for (File file : clonedSet) {
+            if (extension.equals(getExtension(file.getPath()))) {
+                checkFile(modelRepo, file, ENTRY_CREATE);
+                ignoredFiles.remove(file);
+            }
+        }
+    }
+
     @Override
-    protected AbstractWatchQueueReader buildWatchQueueReader(WatchService watchService, Path toWatch) {
-        return new WatchQueueReader(watchService, toWatch, folderFileExtMap, modelRepo);
+    protected AbstractWatchQueueReader buildWatchQueueReader(WatchService watchService, Path toWatch,
+            Map<WatchKey, Path> registeredKeys) {
+        return new WatchQueueReader(watchService, toWatch, registeredKeys, folderFileExtMap, modelRepo);
     }
 
     @Override
@@ -87,13 +114,14 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
     }
 
     @Override
-    protected void registerDirectory(Path subDir) throws IOException {
+    protected WatchKey registerDirectory(Path subDir) throws IOException {
         if (subDir != null && MapUtils.isNotEmpty(folderFileExtMap)) {
             String folderName = subDir.getFileName().toString();
             if (folderFileExtMap.containsKey(folderName)) {
-                subDir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
+                return subDir.register(watchService, ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY);
             }
         }
+        return null;
     }
 
     private static class WatchQueueReader extends AbstractWatchQueueReader {
@@ -102,9 +130,9 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
 
         private ModelRepository modelRepo = null;
 
-        public WatchQueueReader(WatchService watchService, Path dirToWatch, Map<String, String[]> folderFileExtMap,
-                ModelRepository modelRepo) {
-            super(watchService, dirToWatch);
+        public WatchQueueReader(WatchService watchService, Path dirToWatch, Map<WatchKey, Path> registeredKeys,
+                Map<String, String[]> folderFileExtMap, ModelRepository modelRepo) {
+            super(watchService, dirToWatch, registeredKeys);
 
             this.folderFileExtMap = folderFileExtMap;
             this.modelRepo = modelRepo;
@@ -112,7 +140,7 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
 
         @Override
         protected void processWatchEvent(WatchEvent<?> event, Kind<?> kind, Path path) {
-            File toCheck = getFileByFileExtMap(folderFileExtMap, path.toString());
+            File toCheck = getFileByFileExtMap(folderFileExtMap, path.getFileName().toString());
             if (toCheck != null) {
                 checkFile(modelRepo, toCheck, kind);
             }
@@ -133,8 +161,9 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
             while (keys.hasMoreElements()) {
 
                 String foldername = (String) keys.nextElement();
-                if (foldername.equals("service.pid"))
+                if (foldername.equals("service.pid")) {
                     continue;
+                }
 
                 String[] fileExts = ((String) config.get(foldername)).split(",");
 
@@ -237,14 +266,18 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
             try {
                 synchronized (FolderObserver.class) {
                     if ((kind == ENTRY_CREATE || kind == ENTRY_MODIFY) && file != null) {
-                        modelRepo.addOrRefreshModel(file.getName(), FileUtils.openInputStream(file));
+                        if (parsers.contains(getExtension(file.getName()))) {
+                            modelRepo.addOrRefreshModel(file.getName(), FileUtils.openInputStream(file));
+                        } else {
+                            ignoredFiles.add(file);
+                        }
                     } else if (kind == ENTRY_DELETE && file != null) {
                         modelRepo.removeModel(file.getName());
                     }
                 }
             } catch (IOException e) {
-                LoggerFactory.getLogger(FolderObserver.class).warn(
-                        "Cannot open file '" + file.getAbsolutePath() + "' for reading.", e);
+                LoggerFactory.getLogger(FolderObserver.class)
+                        .warn("Cannot open file '" + file.getAbsolutePath() + "' for reading.", e);
             }
         }
     }
@@ -273,7 +306,7 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
     /**
      * Returns the {@link File} object for the given filename. <br />
      * It must be contained in the configuration folder
-     * 
+     *
      * @param filename
      *            the file name to get the {@link File} for
      * @return the corresponding {@link File}
@@ -286,7 +319,7 @@ public class FolderObserver extends AbstractWatchService implements ManagedServi
 
     /**
      * Returns the extension of the given file
-     * 
+     *
      * @param filename
      *            the file name to get the extension
      * @return the file's extension

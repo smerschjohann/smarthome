@@ -1,4 +1,4 @@
-<section ng-class="{'configMain':page!=='services'}">
+<section ng-class="{'configMain':page!=='services'}" class="fill-height">
 	<div class="bindings tab-panel content" ng-if="page === 'bindings'" ng-controller="BindingController">
 		<div class="header-toolbar">
 			<md-button ng-click="refresh()" aria-label="Refresh"> <i class="material-icons">refresh</i></md-button>
@@ -6,7 +6,7 @@
 		<div class="section-header"></div>
 		<div class="container">
 			<div class="bindings row">
-				<div class="col-md-4 col-sm-6 col-xs-12 item-wrapper" ng-repeat="binding in data.bindings">
+				<div class="col-md-4 col-sm-6 col-xs-12 item-wrapper" ng-repeat="binding in data.bindings | orderBy:'name'">
 					<div class="card binding text-left" data-binding-id="{{binding.id}}">
 						<div class="clabel">
 							<h3 class="md-title">
@@ -24,20 +24,16 @@
 			</div>
 		</div>
 	</div>
-	<div class="services" ng-if="page === 'services'" ng-controller="ServicesController">
+	<div class="services fill-height" ng-if="page === 'services'" ng-controller="ServicesController">
 
-		<md-tabs md-stretch-tabs="always" class="section-tabs" md-selected="selectedIndex" >
-		 <md-tab ng-repeat="tab in tabs | orderBy:'-category'" label="{{tab.category}}" layout-fill> 
-		 <md-tab-content layout-fill="">
-		
+		<md-tabs md-stretch-tabs="always" class="section-tabs" md-selected="selectedIndex"> <md-tab ng-repeat="tab in tabs | orderBy:'category' | filter: {'category':'!system'}:true" label="{{tab.category}}" layout-fill> <md-tab-content layout-fill="">
+
 		<div class="container">
 			<div class="services row">
-				<div class="col-md-4 col-sm-6 col-xs-12" ng-repeat="service in tab">
+				<div class="col-md-4 col-sm-6 col-xs-12" ng-repeat="service in tab | orderBy:'label'">
 					<div class="card text-left" data-service-id="{{service.id}}">
 						<div class="clabel">
-							<h3 class="md-title">
-								{{service.label}}
-							</h3>
+							<h3 class="md-title">{{service.label}}</h3>
 
 							<p class="text-left">{{service.id}}</p>
 							<div class="text-right">
@@ -49,7 +45,6 @@
 			</div>
 			<p class="text-center" ng-show="services.length === 0">
 				<span>No configurable service active yet. You can bootstrap a service by adding a configuration.</span>
-				<button class="md-button" title="Add Configuration" ng-click="add()">Add Service Configurarion</button>
 			</p>
 		</div>
 		</md-tab-content></md-tab></md-tabs>
@@ -65,24 +60,30 @@
 				</div>
 			</div>
 		</div>
+		<div class="search" layout="row" layout-align="center center">
+			<i ng-style="{'font-size': '24px'}" class="material-icons">search</i>
+			<md-input-container flex="auto" md-no-float class="md-block"> <input ng-model="searchText" type="text" placeholder="Search"> </md-input-container>
+			<i ng-click="searchText = undefined" ng-class="{'vhidden': !searchText}" ng-style="{'font-size': '24px'}" class="material-icons">close</i>
+		</div>
 		<div class="container thingContainer">
 			<p class="text-center" ng-show="data.things.length == 0">
 				No things configured yet.
 				<button class="md-button" ng-click="$location.path('inbox/setup')">Add Things</button>
 			</p>
 			<div class="things">
-				<div class="clickable" ng-class="{'new':newThingUID==thing.UID,'lastThing':$last}" ng-repeat="thing in data.things | filter:search | orderBy:'label'">
+				<div class="clickable" ng-class="{'new':newThingUID==thing.UID,'lastThing':$last}" ng-repeat="thing in data.things | filter:search(searchText) | orderBy:'label'">
 					<div class="thing fab-item text-left" data-thing-uid="{{thing.UID}}" ng-click="navigateTo('things/view/' + thing.UID)">
-						<div class="circle">{{thing.UID.split(':')[1].substring(0,1).toUpperCase()}}</div>
+						<div class="circle">{{thing.thingTypeUID?thing.thingTypeUID.split(':')[1].substring(0,1).toUpperCase():''}}</div>
 						<div class="cbody item-content">
-							<h3>
-								{{thing.label}} <small class="badge" ng-class="thing.statusInfo.status.toLowerCase()">{{thing.statusInfo.status}}</small>
-							</h3>
-							<p>{{getThingTypeLabel(thing.thingTypeUID)}}</p>
-							<p>{{thing.UID}}</p>
-							<div class="actions" ng-class="{'new':newThingUID==thing.UID}">
-								<md-button ng-click="navigateTo('things/edit/' + thing.UID)" aria-label="Edit"> <i class="material-icons">edit</i></md-button>
-								<md-button ng-click="remove(thing, $event)" aria-label="Delete"> <i class="material-icons">delete</i></md-button>
+							<div flex="70">
+								<h3>
+									{{thing.label}} <small class="badge" ng-class="thing.statusInfo.status.toLowerCase()">{{thing.statusInfo.status}}</small>
+								</h3>
+								<p>{{getThingTypeLabel(thing.thingTypeUID)}}</p>
+								<p>{{thing.UID}}</p>
+							</div>
+							<div class="actions" flex="30" ng-class="{'new':newThingUID==thing.UID}">
+								<i class="material-icons" ng-click="navigateTo('things/edit/' + thing.UID)" aria-label="Edit">edit</i> <i class="material-icons" ng-click="remove(thing, $event)" aria-label="Delete">delete</i>
 							</div>
 						</div>
 						<hr class="border-line" ng-show="!$last" />
@@ -104,7 +105,8 @@
 			</div>
 		</div>
 		<div class="container">
-			<h3>{{thingType.label}}</h3>
+			<h3>{{thing.label}}</h3>
+			<p>{{thingType.label}}</p>
 			<p ng-bind-html="thingType.description"></p>
 			<hr />
 			<p>
@@ -116,40 +118,66 @@
 				<span>{{thing.statusInfo.description}}</span>
 			</p>
 			<div ng-init="details=false" ng-if="hasProperties(thing.properties)">
-            <md-button class="thing-properties"  ng-click="details=!details">{{details?'hide':'show'}} properties</md-button>
-                 <table class="table table-bordered">
-                <tr ng-show="details" ng-repeat="(key,value) in thing.properties">                  
-                        <td >{{key}}</td>
-                        <td>{{value}}</td>
-                    </tr>
-                </table>
-            </div>
+				<md-button class="thing-properties" ng-click="details=!details">{{details?'hide':'show'}} properties</md-button>
+				<table class="table table-bordered">
+					<tr ng-show="details" ng-repeat="(key,value) in thing.properties">
+						<td>{{key}}</td>
+						<td>{{value}}</td>
+					</tr>
+				</table>
+			</div>
 			<h2 class="inline" ng-show="thing.channels.length > 0">Channels</h2>
-			<md-button class="showmore no-margin"  ng-click="refreshChannels(showAdvanced=!showAdvanced)" ng-show="isAdvanced">{{showAdvanced ? 'show less' : 'show more'}}</md-button>
+			<md-button class="showmore no-margin" ng-click="refreshChannels(showAdvanced=!showAdvanced)" ng-show="isAdvanced">{{showAdvanced ? 'show less' : 'show more'}}</md-button>
 			<div class="channels">
 				<div ng-repeat="group in thingChannels track by $index">
 					<div ng-init="collapsed=false">
-						<div ng-show="!angular.isUndefined(group.name) && group.name.length > 0 && group.channels && group.channels.length > 0">
+						<div ng-show="!angular.isUndefined(group.name) && group.name.length > 0 && group.channels && group.channels.length > 0" class="channelGroup">
 							<span class="md-title">{{group.name}}</span>
 							<i ng-show="!collapsed" ng-click="collapsed=!collapsed" style="font-size: 22px; float: right;" class="md-raised material-icons">unfold_less</i> <i ng-show="collapsed" ng-click="collapsed=!collapsed" style="color: grey; font-size: 22px; float: right;" class="md-raised material-icons">unfold_more</i>
 							<div>{{group.description}}</div>
 						</div>
 						<div class="channel fab-item" ng-init="index=1" ng-repeat="channel in group.channels">
 							<div ng-show="!collapsed">
-								<md-button ng-if="channel.linkedItems.length == 0" class="md-fab" ng-click="enableChannel(thing.UID, channel.id, $event)" aria-label="Off"> <i class="material-icons">radio_button_unchecked</i></md-button>
-								<md-button ng-if="channel.linkedItems.length > 0" class="md-fab" ng-click="disableChannel(thing.UID, channel.id, $event)" aria-label="On"> <i class="material-icons">radio_button_checked</i></md-button>
+								<div ng-if="channel.kind!='TRIGGER'">
+									<md-button ng-if="!advancedMode && channel.linkedItems.length == 0" class="md-fab" ng-click="enableChannel(thing.UID, channel.id, $event)" aria-label="Off"> <i class="material-icons">radio_button_unchecked</i></md-button>
+									<md-button ng-if="!advancedMode && channel.linkedItems.length > 0" class="md-fab" ng-click="disableChannel(thing.UID, channel.id,'', $event)" aria-label="On"> <i class="material-icons">radio_button_checked</i></md-button>
+									<md-button ng-if="advancedMode" class="md-fab" long-press on-long-press="enableChannel(thing.UID, channel.id, $event,true)" on-click="enableChannel(thing.UID, channel.id, $event)"> <i class="material-icons">{{channel.linkedItems.length > 0 ? 'radio_button_checked':'radio_button_unchecked'}}</i></md-button>
+								</div>
+								<div ng-if="channel.kind=='TRIGGER'" class="circle" aria-label="Trigger">{{channel.channelType.label?channel.channelType.label.substring(0,1).toUpperCase():'T'}}</div>
 								<div class="item-content">
-									<h3 ng-if="getChannelById(channel.id).label">{{getChannelById(channel.id).label}}</h3>
-									<h3 ng-if="!getChannelById(channel.id).label && getChannelTypeById(channel.id).label">{{getChannelTypeById(channel.id).label}}</h3>
-									<h3 ng-if="!getChannelById(channel.id).label && !getChannelTypeById(channel.id).label">{{channel.id}}</h3>
-									<p>{{thing.UID + ':' + channel.id}}</p>
-									<p ng-if="getChannelById(channel.id).description" ng-bind-html="getChannelTypeById(channel.id).description"></p>
-									<p ng-if="!getChannelById(channel.id).description && getChannelTypeById(channel.id).description" ng-bind-html="getChannelTypeById(channel.id).description"></p>
+									<h3 ng-if="channel.label">{{channel.label}}</h3>
+									<h3 ng-if="!channel.label && channel.channelType.label">{{channel.channelType.label}}</h3>
+									<h3 ng-if="!channel.label && !channel.channelType.label">{{channel.id}}</h3>
+									<p>
+										{{thing.UID + ':' + channel.id}}<i ng-show="advancedMode" class="material-icons copy-clipboard" copyclipboard="{{thing.UID + ':' + channel.id}}">content_copy</i>
+									</p>
+									<p ng-if="channel.description" ng-bind-html="channel.description"></p>
+									<p ng-if="!channel.description && channel.channelType.description" ng-bind-html="channel.channelType.description"></p>
 									<div class="actions">
-										<md-button ng-if="getChannelFromChannelTypes(channel.channelTypeUID).parameters && getChannelFromChannelTypes(channel.channelTypeUID).parameters.length > 0" ng-click="configChannel(channel,thing,$event)" aria-label="Edit"> <i class="material-icons">edit</i></md-button>
+										<i ng-if="getChannelFromChannelTypes(channel.channelTypeUID).parameters && getChannelFromChannelTypes(channel.channelTypeUID).parameters.length > 0" ng-click="configChannel(channel,thing,$event)" aria-label="Edit" class="material-icons">edit</i> <i class="material-icons" style="transition: none" ng-show="advancedMode" ng-click="getLinkedItems(channel)">{{channel.showItems ? 'unfold_less':'unfold_more'}}</i>
 									</div>
 								</div>
-								<hr class="border-line" />
+								<div ng-show="channel.showItems" class='linkedItems item-content'>
+									<h3 class="noMargin">
+										Linked items
+										<button class="md-fab md-custom-plus md-button md-ink-ripple" type="button" ng-click="linkChannel(channel.id, $event)" aria-label="Add">
+											<span class="ng-scope">+</span>
+											<div class="md-ripple-container"></div>
+										</button>
+									</h3>
+									<div ng-repeat="item in channel.items | orderBy" class="row cursor-pointer " ng-class="{'borderhidden':$last}" ng-click="navigateTo('item/edit/' + item.name)">
+										<div class="col-xs-1">
+											<span class="circle">{{item.label.substring(0,1).toUpperCase()}}</span>
+										</div>
+										<div class="col-xs-9 name">
+											{{item.label}} <small><span>({{item.name}})</span></small>
+										</div>
+										<div class="col-xs-2 action">
+											<i class="material-icons" ng-click="disableChannel(thing.UID, channel.id, item.name, $event)">delete</i>
+										</div>
+									</div>
+								</div>
+								<hr ng-if="!$last" class="border-line" />
 							</div>
 						</div>
 					</div>
@@ -170,7 +198,7 @@
 		</div>
 		<div ng-init="counter=0;form={}">
 			<div ng-include="'partials/include.thingconfig.html'" onload="counter=counter+1;"></div>
-			<div class="container">
+			<div class="container" ng-show="parameters.length > 0">
 				<h3>Configuration Parameters</h3>
 				<p>Configure parameters for the thing.</p>
 				<div ng-if="counter==1" ng-include="'partials/include.config.html'"></div>
@@ -185,24 +213,48 @@
 		<div class="section-header">
 			<div class="container">
 				<div class="toolbar">
-					<md-button class="md-fab" ng-click="navigateTo('item/create')" aria-label="Add Item"> <i class="material-icons">add</i></md-button>
+					<md-button class="md-fab" ng-click="createItem(selectedType,selectedGroup)" aria-label="Add Item"> <i class="material-icons">add</i></md-button>
 				</div>
 			</div>
+		</div>
+		<div class="search itemSearch" layout="row" layout-align="center center">
+			<div layout="row" flex="85" class="searchControl" layout-align="start center">
+				<i ng-style="{'font-size': '24px'}" class="material-icons">search</i>
+				<md-input-container flex="90" md-no-float class="md-block searchBox"> <input ng-model="searchText" type="text" placeholder="Search"> </md-input-container>
+				<i ng-click="searchText = undefined" ng-class="{'vhidden': !searchText}" ng-style="{'font-size': '24px'}" class="material-icons clickable">close</i>
+			</div>
+			<div layout="row" flex="15" class="controls" layout-align="start center" ng-init="showMore=false">
+				<i class="material-icons clickable" ng-click="showMore=!showMore">{{showMore?'unfold_less':'unfold_more'}}</i>
+				<button class="md-button clickable" ng-click="clearAll()">clear</button>
+			</div>
+		</div>
+		<div class="row" ng-show="showMore" class="searchBox">
+			<md-autocomplete class="col-xs-12 col-sm-6 typeSearch" md-min-length="0" md-selected-item="selectedType" md-search-text="searchType" md-items="type in searchInOptions(types,null,searchType)" placeholder="Filter by type"> <md-item-template> <span md-highlight-text="searchType" md-highlight-flags="^i">{{type}}</span> </md-item-template> <md-not-found> No matches found. </md-not-found> </md-autocomplete>
+			<md-autocomplete class="col-xs-12 col-sm-6 groupSearch" md-min-length="0" md-selected-item="selectedGroup" md-search-text="searchGroup" md-items="group in searchInOptions(groups,['label'],searchGroup)" md-item-text="group.label?group.label:group.name" placeholder="Filter by group"> <md-item-template> <span md-highlight-text="searchGroup" md-highlight-flags="^i">{{group.label?group.label:group.name}}</span> </md-item-template> <md-not-found> No matches found. </md-not-found> </md-autocomplete>
 		</div>
 		<div class="container">
 			<p class="text-center" ng-show="items.length == 0">
 				No items defined.
 				<button class="md-button" ng-click="navigateTo('item/create')">Add Items</button>
 			</p>
+
 			<div class="things">
-				<div class="clickable" ng-repeat="item in items | orderBy:'label'">
-					<div class="thing fab-item text-left" ng-click="navigateTo('item/edit/' + item.name)">
-						<div class="circle"><img width="40" ng-src="{{getSrcURL(item.category,item.type)}}" onerror="this.style.display='none';this.className='itemIcon'"/><span class="itemIcon-text">{{item.label?item.label.substring(0,1).toUpperCase():item.name.substring(0,1).toUpperCase()}}</span></div>
+				<div ng-repeat="item in items | filter: filterItems() | orderBy:'label'">
+					<div class="thing fab-item text-left">
+						<div class="circle">
+							<img width="40" ng-src="{{getSrcURL(item.category,item.type)}}" onerror="this.style.display='none';this.className='itemIcon'" />
+							<span class="itemIcon-text">{{item.label?item.label.substring(0,1).toUpperCase():item.name.substring(0,1).toUpperCase()}}</span>
+						</div>
 						<div class="cbody item-content">
-							<h3>{{item.label}}&nbsp;</h3>
-							<p>{{item.name}}</p>
-							<div class="actions">
-								<md-button ng-click="remove(item, $event)" aria-label="Delete"> <i class="material-icons">delete</i></md-button>
+							<div flex="85">
+								<h3 class="clickable" ng-click="setGroupFilter(item)">{{item.label}}&nbsp;</h3>
+								<p>
+									{{item.name}}<i class="material-icons copy-clipboard" copyclipboard="{{item.name}}">content_copy</i>
+								</p>
+								<p class="clickable" ng-click="setTypeFilter(item)">{{item.type}}</p>
+							</div>
+							<div class="actions" flex="15">
+								<i class="material-icons" ng-click="navigateTo('item/edit/' + item.name)" aria-label="Delete">edit</i> <i class="material-icons" ng-click="remove(item, $event)" aria-label="Delete">delete</i>
 							</div>
 						</div>
 						<hr class="border-line" ng-show="!$last" />

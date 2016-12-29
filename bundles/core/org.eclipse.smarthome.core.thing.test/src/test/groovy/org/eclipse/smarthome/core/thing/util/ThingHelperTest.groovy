@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -85,4 +85,47 @@ class ThingHelperTest {
 		assertFalse ThingHelper.equals(thingA, thingB)
 	}
 
+
+    @Test
+    void 'Two things are different after label was modified'() {
+        Thing thingA = ThingBuilder.create(new ThingUID(new ThingTypeUID("binding:type"), "thingId"))
+                .withConfiguration(new Configuration()).withLabel("foo").build()
+
+        Thing thingB = ThingBuilder.create(new ThingUID(new ThingTypeUID("binding:type"), "thingId"))
+                .withConfiguration(new Configuration()).withLabel("foo").build()
+
+        assertTrue ThingHelper.equals(thingA, thingB)
+
+        thingB.setLabel("bar")
+
+        assertFalse ThingHelper.equals(thingA, thingB)
+    }
+
+    @Test
+    void 'Two things are different after location was modified'() {
+        Thing thingA = ThingBuilder.create(new ThingUID(new ThingTypeUID("binding:type"), "thingId"))
+                .withConfiguration(new Configuration()).withLocation("foo").build()
+
+        Thing thingB = ThingBuilder.create(new ThingUID(new ThingTypeUID("binding:type"), "thingId"))
+                .withConfiguration(new Configuration()).withLocation("foo").build()
+
+        assertTrue ThingHelper.equals(thingA, thingB)
+
+        thingB.setLocation("bar")
+
+        assertFalse ThingHelper.equals(thingA, thingB)
+    }
+
+    @Test(expected=IllegalArgumentException)
+    void 'assert that no duplicate channels can be added'() {
+        ThingTypeUID THING_TYPE_UID = new ThingTypeUID("test", "test")
+        ThingUID THING_UID = new ThingUID(THING_TYPE_UID, "test")
+
+        Thing thing = ThingBuilder.create(THING_TYPE_UID, THING_UID).withChannels(
+                new Channel(new ChannelUID(THING_UID, "channel1"), ""),
+                new Channel(new ChannelUID(THING_UID, "channel2"), "")
+                ).build();
+
+        ThingHelper.addChannelsToThing(thing, [new Channel(new ChannelUID(THING_UID, "channel2"), ""), new Channel(new ChannelUID(THING_UID, "channel3"), "")])
+    }
 }

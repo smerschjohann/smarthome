@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -50,7 +50,7 @@ public class DateExpression extends AbstractExpression<DateExpressionPart> {
 
     public DateExpression(final String dateExpression, final Date startTime, final TimeZone zone)
             throws ParseException {
-        super(dateExpression, "", startTime, zone, 0);
+        super(dateExpression, "", startTime, zone, 0, 1);
     }
 
     @Override
@@ -172,6 +172,11 @@ public class DateExpression extends AbstractExpression<DateExpressionPart> {
         public int order() {
             return 1;
         }
+    }
+
+    @Override
+    public boolean hasFloatingStartDate() {
+        return false;
     }
 
 }

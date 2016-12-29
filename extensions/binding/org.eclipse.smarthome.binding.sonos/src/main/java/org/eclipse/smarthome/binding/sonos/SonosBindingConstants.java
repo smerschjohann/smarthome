@@ -1,6 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
- *
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -20,11 +19,12 @@ import com.google.common.collect.Sets;
  * used across the whole binding.
  *
  * @author Karel Goderis - Initial contribution
+ * @author Kai Kreuzer - Changed ESH-PREFIX and cleaned up warnings
  */
 public class SonosBindingConstants {
 
     public static final String BINDING_ID = "sonos";
-    public static final String ESH_PREFIX = "openHAB-";
+    public static final String ESH_PREFIX = "smarthome-";
 
     // List of all Thing Type UIDs
     // Column (:) is not used for PLAY:1, PLAY:3, PLAY:5 and CONNECT:AMP because of
@@ -42,11 +42,10 @@ public class SonosBindingConstants {
             CONNECTAMP_THING_TYPE_UID);
 
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = new HashSet<ThingTypeUID>(
-            SUPPORTED_KNOWN_THING_TYPES_UIDS) {
-        {
-            add(ZONEPLAYER_THING_TYPE_UID);
-        }
-    };
+            SUPPORTED_KNOWN_THING_TYPES_UIDS);
+    static {
+        SUPPORTED_THING_TYPES_UIDS.add(ZONEPLAYER_THING_TYPE_UID);
+    }
 
     // List of all Channel ids
     public final static String ADD = "add";
@@ -88,5 +87,12 @@ public class SonosBindingConstants {
     public final static String COORDINATOR = "coordinator";
     public final static String MODELID = "modelId";
     public final static String SLEEPTIMER = "sleeptimer";
+    public final static String SHUFFLE = "shuffle";
+    public final static String REPEAT = "repeat";
+    public final static String CURRENTTRANSPORTURI = "currenttransporturi";
+    public final static String CURRENTTRACKURI = "currenttrackuri";
+
+    // List of properties
+    public static final String IDENTIFICATION = "identification";
 
 }

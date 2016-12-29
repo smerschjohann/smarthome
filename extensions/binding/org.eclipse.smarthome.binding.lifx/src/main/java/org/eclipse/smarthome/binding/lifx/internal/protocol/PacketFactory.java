@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -18,6 +18,7 @@ import java.util.Map;
  *
  * @author Tim Buckley - Initial Contribution
  * @author Karel Goderis - Enhancement for the V2 LIFX Firmware and LAN Protocol Specification
+ * @author Wouter Born - Support LIFX 2016 product line-up and infrared functionality
  */
 public class PacketFactory {
 
@@ -44,6 +45,7 @@ public class PacketFactory {
         register(GetHostInfoRequest.class);
         register(GetInfoRequest.class);
         register(GetLabelRequest.class);
+        register(GetLightInfraredRequest.class);
         register(GetLightPowerRequest.class);
         register(GetLocationRequest.class);
         register(GetMeshFirmwareRequest.class);
@@ -59,6 +61,7 @@ public class PacketFactory {
         register(SetColorRequest.class);
         register(SetDimAbsoluteRequest.class);
         register(SetLabelRequest.class);
+        register(SetLightInfraredRequest.class);
         register(SetLightPowerRequest.class);
         register(SetPowerRequest.class);
         register(SetTagsRequest.class);
@@ -67,6 +70,7 @@ public class PacketFactory {
         register(StateHostInfoResponse.class);
         register(StateInfoResponse.class);
         register(StateLabelResponse.class);
+        register(StateLightInfraredResponse.class);
         register(StateLightPowerResponse.class);
         register(StateLocationResponse.class);
         register(StateMeshFirmwareResponse.class);

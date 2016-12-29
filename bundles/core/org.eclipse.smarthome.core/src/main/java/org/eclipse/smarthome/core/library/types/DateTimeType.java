@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -84,6 +84,11 @@ public class DateTimeType implements PrimitiveType, State, Command {
 
     @Override
     public String toString() {
+        return toFullString();
+    }
+
+    @Override
+    public String toFullString() {
         return new SimpleDateFormat(DATE_PATTERN_WITH_TZ_AND_MS).format(calendar.getTime());
     }
 

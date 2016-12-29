@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -30,7 +30,7 @@ import com.google.common.collect.Lists;
 public class LifxHandlerFactory extends BaseThingHandlerFactory {
 
     public final static Collection<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Lists.newArrayList(THING_TYPE_COLORLIGHT,
-            THING_TYPE_WHITELIGHT);
+            THING_TYPE_COLORIRLIGHT, THING_TYPE_WHITELIGHT);
 
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
@@ -47,7 +47,8 @@ public class LifxHandlerFactory extends BaseThingHandlerFactory {
 
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();
 
-        if (thingTypeUID.equals(THING_TYPE_COLORLIGHT) || thingTypeUID.equals(THING_TYPE_WHITELIGHT)) {
+        if (thingTypeUID.equals(THING_TYPE_COLORLIGHT) || thingTypeUID.equals(THING_TYPE_COLORIRLIGHT)
+                || thingTypeUID.equals(THING_TYPE_WHITELIGHT)) {
             return new LifxLightHandler(thing);
         }
 

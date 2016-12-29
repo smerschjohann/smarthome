@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,19 +7,21 @@
  */
 package org.eclipse.smarthome.model.persistence.extensions;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
 import java.util.List;
+import java.util.Set;
 
 import org.eclipse.smarthome.core.items.GenericItem;
 import org.eclipse.smarthome.core.library.types.DecimalType;
 import org.eclipse.smarthome.core.persistence.HistoricItem;
 import org.eclipse.smarthome.core.persistence.PersistenceService;
+import org.eclipse.smarthome.core.persistence.PersistenceServiceRegistry;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.model.persistence.tests.TestPersistenceService;
 import org.joda.time.DateMidnight;
+import org.joda.time.DateTime;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,18 +29,43 @@ import org.junit.Test;
 /**
  * @author Kai Kreuzer - Initial contribution and API
  * @author Chris Jackson
+ * @author Jan N. Klug
  */
 @SuppressWarnings("deprecation")
 public class PersistenceExtensionsTest {
 
-    private PersistenceService testPersistenceService = new TestPersistenceService();
+    private PersistenceServiceRegistry registry = new PersistenceServiceRegistry() {
+
+        private PersistenceService testPersistenceService = new TestPersistenceService();
+
+        @Override
+        public String getDefaultId() {
+            return null;
+        }
+
+        @Override
+        public PersistenceService getDefault() {
+            return testPersistenceService;
+        }
+
+        @Override
+        public Set<PersistenceService> getAll() {
+            return null;
+        }
+
+        @Override
+        public PersistenceService get(String serviceId) {
+            return testPersistenceService;
+        }
+    };
+
     private PersistenceExtensions ext;
     private GenericItem item;
 
     @Before
     public void setUp() {
         ext = new PersistenceExtensions();
-        ext.addPersistenceService(testPersistenceService);
+        ext.setPersistenceServiceRegistry(registry);
         item = new GenericItem("Test", "Test") {
             @Override
             public List<Class<? extends State>> getAcceptedDataTypes() {
@@ -54,7 +81,7 @@ public class PersistenceExtensionsTest {
 
     @After
     public void tearDown() {
-        ext.removePersistenceService(testPersistenceService);
+        ext.unsetPersistenceServiceRegistry(registry);
     }
 
     @Test
@@ -99,10 +126,15 @@ public class PersistenceExtensionsTest {
     @Test
     public void testAverageSince() {
         item.setState(new DecimalType(3025));
-        DecimalType average = PersistenceExtensions.averageSince(item, new DateMidnight(2003, 1, 1), "test");
-        assertEquals("2100", average.toString());
+        DateMidnight startStored = new DateMidnight(2003, 1, 1);
+        DateMidnight endStored = new DateMidnight(2012, 1, 1);
+        long storedInterval = endStored.getMillis() - startStored.getMillis();
+        long recentInterval = DateTime.now().getMillis() - endStored.getMillis();
+        double expected = (2007.4994 * storedInterval + 2518.5 * recentInterval) / (storedInterval + recentInterval);
+        DecimalType average = PersistenceExtensions.averageSince(item, startStored, "test");
+        assertEquals(expected, average.doubleValue(), 0.01);
     }
-    
+
     @Test
     public void testPreviousStateNoSkip() {
         item.setState(new DecimalType(4321));

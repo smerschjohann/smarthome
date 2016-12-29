@@ -1,6 +1,5 @@
 /**
- * Copyright (c) 2010-2015, openHAB.org and others.
- *
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -16,6 +15,7 @@ import java.io.IOException;
  *
  * @author Rainer Ostendorf
  * @author Patrick Koenemann
+ * @author Mihaela Memova - removed duplicated check for the percent value range
  */
 public class FrontierSiliconRadio {
 
@@ -133,8 +133,7 @@ public class FrontierSiliconRadio {
      * @throws IOException if communication with the radio failed, e.g. because the device is not reachable.
      */
     public void setVolumePercent(int volume) throws IOException {
-        final int newVolumePercent = volume < 0 ? 0 : volume > 100 ? 100 : volume;
-        final int newVolumeAbsolute = (newVolumePercent * 32) / 100;
+        final int newVolumeAbsolute = (volume * 32) / 100;
         final String params = "value=" + newVolumeAbsolute;
         conn.doRequest(REQUEST_SET_VOLUME, params);
         currentVolume = volume;

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -44,14 +44,18 @@ public class HueLightDiscoveryService extends AbstractDiscoveryService implement
     private final Logger logger = LoggerFactory.getLogger(HueLightDiscoveryService.class);
 
     private final static int SEARCH_TIME = 60;
+    private final static String MODEL_ID = "modelId";
 
     // @formatter:off
     private final static Map<String, String> TYPE_TO_ZIGBEE_ID_MAP = new ImmutableMap.Builder<String, String>()
             .put("on_off_light", "0000")
+            .put("on_off_plug_in_unit", "0010")
             .put("dimmable_light", "0100")
+            .put("dimmable_plug_in_unit", "0110")
             .put("color_light", "0200")
             .put("extended_color_light", "0210")
-            .put("color_temperature_light", "0220").build();
+            .put("color_temperature_light", "0220")
+            .build();
     // @formatter:on
 
     private HueBridgeHandler hueBridgeHandler;
@@ -103,14 +107,17 @@ public class HueLightDiscoveryService extends AbstractDiscoveryService implement
         ThingUID thingUID = getThingUID(light);
         ThingTypeUID thingTypeUID = getThingTypeUID(light);
 
+        String modelId = light.getModelID().replaceAll(HueLightHandler.NORMALIZE_ID_REGEX, "_");
+
         if (thingUID != null && thingTypeUID != null) {
             ThingUID bridgeUID = hueBridgeHandler.getThing().getUID();
             Map<String, Object> properties = new HashMap<>(1);
             properties.put(LIGHT_ID, light.getId());
+            properties.put(MODEL_ID, modelId);
 
             /*
              * TODO retrieve the light´s unique id (available since Hue bridge versions > 1.3) and set the mac address
-             * as discovery result representationÏ. For this purpose the jue library has to be modified.
+             * as discovery result representation. For this purpose the jue library has to be modified.
              */
 
             DiscoveryResult discoveryResult = DiscoveryResultBuilder.create(thingUID).withThingType(thingTypeUID)
@@ -118,7 +125,8 @@ public class HueLightDiscoveryService extends AbstractDiscoveryService implement
 
             thingDiscovered(discoveryResult);
         } else {
-            logger.debug("discovered unsupported light of type '{}' with id {}", light.getModelID(), light.getId());
+            logger.debug("discovered unsupported light of type '{}' and model '{}' with id {}", light.getType(),
+                    modelId, light.getId());
         }
     }
 
@@ -141,7 +149,7 @@ public class HueLightDiscoveryService extends AbstractDiscoveryService implement
         ThingTypeUID thingTypeUID = getThingTypeUID(light);
 
         if (thingTypeUID != null && getSupportedThingTypes().contains(thingTypeUID)) {
-            return new ThingUID(BINDING_ID, bridgeUID, light.getId());
+            return new ThingUID(thingTypeUID, bridgeUID, light.getId());
         } else {
             return null;
         }

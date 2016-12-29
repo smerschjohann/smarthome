@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -89,4 +89,26 @@ public class HSBTypeTest {
         assertEquals(hsb.getSaturation(), hsbRgb.getSaturation());
         assertEquals(hsb.getBrightness(), hsbRgb.getBrightness());
     }
+
+    @Test
+    public void testConversionToOnOffType() {
+        assertEquals(OnOffType.ON, new HSBType("100,100,100").as(OnOffType.class));
+        assertEquals(OnOffType.ON, new HSBType("100,100,1").as(OnOffType.class));
+        assertEquals(OnOffType.OFF, new HSBType("100,100,0").as(OnOffType.class));
+    }
+
+    @Test
+    public void testConversionToDecimalType() {
+        assertEquals(new DecimalType("1.0"), new HSBType("100,100,100").as(DecimalType.class));
+        assertEquals(new DecimalType("0.01"), new HSBType("100,100,1").as(DecimalType.class));
+        assertEquals(DecimalType.ZERO, new HSBType("100,100,0").as(DecimalType.class));
+    }
+
+    @Test
+    public void testConversionToPercentType() {
+        assertEquals(PercentType.HUNDRED, new HSBType("100,100,100").as(PercentType.class));
+        assertEquals(new PercentType("1"), new HSBType("100,100,1").as(PercentType.class));
+        assertEquals(PercentType.ZERO, new HSBType("100,100,0").as(PercentType.class));
+    }
+
 }

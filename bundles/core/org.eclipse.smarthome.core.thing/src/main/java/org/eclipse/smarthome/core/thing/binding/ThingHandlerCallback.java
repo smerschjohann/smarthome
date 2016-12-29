@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -71,6 +71,14 @@ public interface ThingHandlerCallback {
      * @param thingTypeUID the new type of the thing (must not be null)
      * @param configuration a configuration that should be applied to the given {@link Thing}
      */
-    void changeThingType(Thing thing, ThingTypeUID thingTypeUID, Configuration configuration);
+    void migrateThingType(Thing thing, ThingTypeUID thingTypeUID, Configuration configuration);
+
+    /**
+     * Informs the framework that a channel has been triggered.
+     *
+     * @param channelUID UID of the channel over which has been triggered.
+     * @param event Event.
+     */
+    void channelTriggered(Thing thing, ChannelUID channelUID, String event);
 
 }

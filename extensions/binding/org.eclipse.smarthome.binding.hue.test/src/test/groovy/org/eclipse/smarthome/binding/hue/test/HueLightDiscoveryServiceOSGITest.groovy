@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -29,10 +29,8 @@ import org.eclipse.smarthome.core.thing.ThingStatus
 import org.eclipse.smarthome.core.thing.ThingStatusDetail
 import org.eclipse.smarthome.core.thing.ThingTypeUID
 import org.eclipse.smarthome.core.thing.ThingUID
-import org.eclipse.smarthome.core.thing.binding.ThingHandler
 import org.eclipse.smarthome.core.thing.binding.builder.ThingStatusInfoBuilder
 import org.eclipse.smarthome.test.AsyncResultWrapper
-import org.eclipse.smarthome.test.OSGiTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -45,7 +43,7 @@ import org.junit.Test
  * @author Andre Fuechsel - added test 'assert start search is called()'
  *                        - modified tests after introducing the generic thing types
  */
-class HueLightDiscoveryServiceOSGITest extends OSGiTest {
+class HueLightDiscoveryServiceOSGITest extends AbstractHueOSGiTest {
 
     HueThingHandlerFactory hueThingHandlerFactory
     DiscoveryListener discoveryListener
@@ -65,9 +63,6 @@ class HueLightDiscoveryServiceOSGITest extends OSGiTest {
         thingRegistry = getService(ThingRegistry, ThingRegistry)
         assertThat thingRegistry, is(notNullValue())
 
-        hueBridgeHandler = getService(ThingHandler, HueBridgeHandler)
-        assertThat hueBridgeHandler, is(nullValue())
-
         Configuration configuration = new Configuration().with {
             put(HOST, "1.2.3.4")
             put(USER_NAME, "testUserName")
@@ -83,11 +78,8 @@ class HueLightDiscoveryServiceOSGITest extends OSGiTest {
         assertThat hueBridge, is(notNullValue())
         thingRegistry.add(hueBridge)
 
-        // wait for HueBridgeHandler to be registered
-        waitForAssert({
-            hueBridgeHandler = getService(ThingHandler, HueBridgeHandler)
-            assertThat hueBridgeHandler, is(notNullValue())
-        }, 10000)
+        hueBridgeHandler = getThingHandler(HueBridgeHandler)
+        assertThat hueBridgeHandler, is(notNullValue())
 
         discoveryService = getService(DiscoveryService, HueLightDiscoveryService)
         assertThat discoveryService, is(notNullValue())
@@ -135,7 +127,7 @@ class HueLightDiscoveryServiceOSGITest extends OSGiTest {
 
         resultWrapper.wrappedObject.with {
             assertThat flag, is (DiscoveryResultFlag.NEW)
-            assertThat thingUID.toString(), is("hue::testBridge:" + light.id)
+            assertThat thingUID.toString(), is("hue:0210:testBridge:" + light.id)
             assertThat thingTypeUID, is (THING_TYPE_EXTENDED_COLOR_LIGHT)
             assertThat bridgeUID, is(hueBridge.getUID())
             assertThat properties.get(LIGHT_ID), is (light.id)

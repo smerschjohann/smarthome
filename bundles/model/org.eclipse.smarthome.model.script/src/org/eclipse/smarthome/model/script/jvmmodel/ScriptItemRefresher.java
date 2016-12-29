@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -17,6 +17,7 @@ import org.eclipse.smarthome.core.items.Item;
 import org.eclipse.smarthome.core.items.ItemRegistry;
 import org.eclipse.smarthome.core.items.ItemRegistryChangeListener;
 import org.eclipse.smarthome.model.core.ModelRepository;
+import org.eclipse.smarthome.model.script.engine.action.ActionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +31,9 @@ import org.slf4j.LoggerFactory;
 public class ScriptItemRefresher implements ItemRegistryChangeListener {
 
     private final Logger logger = LoggerFactory.getLogger(ScriptItemRefresher.class);
+
+    // delay before rule resources are refreshed after items or services have changed
+    private static final long REFRESH_DELAY = 2000;
 
     ModelRepository modelRepository;
     private ItemRegistry itemRegistry;
@@ -52,6 +56,14 @@ public class ScriptItemRefresher implements ItemRegistryChangeListener {
     public void unsetItemRegistry(ItemRegistry itemRegistry) {
         this.itemRegistry.removeRegistryChangeListener(this);
         this.itemRegistry = null;
+    }
+
+    protected void addActionService(ActionService actionService) {
+        scheduleScriptRefresh();
+    }
+
+    protected void removeActionService(ActionService actionService) {
+        scheduleScriptRefresh();
     }
 
     @Override
@@ -78,7 +90,7 @@ public class ScriptItemRefresher implements ItemRegistryChangeListener {
         if (job != null && !job.isDone()) {
             job.cancel(false);
         }
-        job = scheduler.schedule(runnable, 1000, TimeUnit.SECONDS);
+        job = scheduler.schedule(runnable, REFRESH_DELAY, TimeUnit.MILLISECONDS);
     }
 
     Runnable runnable = new Runnable() {

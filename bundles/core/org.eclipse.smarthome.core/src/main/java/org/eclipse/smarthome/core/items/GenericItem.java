@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -22,7 +22,9 @@ import java.util.concurrent.ExecutorService;
 import org.eclipse.smarthome.core.common.ThreadPoolManager;
 import org.eclipse.smarthome.core.events.EventPublisher;
 import org.eclipse.smarthome.core.items.events.ItemEventFactory;
+import org.eclipse.smarthome.core.library.internal.StateConverterUtil;
 import org.eclipse.smarthome.core.types.Command;
+import org.eclipse.smarthome.core.types.Convertible;
 import org.eclipse.smarthome.core.types.RefreshType;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.core.types.StateDescription;
@@ -90,10 +92,10 @@ abstract public class GenericItem implements ActiveItem {
      */
     @Override
     public State getStateAs(Class<? extends State> typeClass) {
-        if (typeClass != null && typeClass.isInstance(state)) {
-            return state;
+        if (state instanceof Convertible) {
+            return ((Convertible) state).as(typeClass);
         } else {
-            return null;
+            return StateConverterUtil.defaultConversion(state, typeClass);
         }
     }
 
@@ -192,12 +194,27 @@ abstract public class GenericItem implements ActiveItem {
     }
 
     /**
-     * Sets new state, notifies listeners and sends events.
+     * Set a new state.
+     *
+     * Subclasses may override this method in order to do necessary conversions upfront. Afterwards,
+     * {@link #applyState(State)} should be called by classes overriding this method.
      *
      * @param state
      *            new state of this item
      */
     public void setState(State state) {
+        applyState(state);
+    }
+
+    /**
+     * Sets new state, notifies listeners and sends events.
+     *
+     * Classes overriding the {@link #setState(State)} method should call this method in order to actually set the
+     * state, inform listeners and send the event.
+     *
+     * @param state new state of this item
+     */
+    protected final void applyState(State state) {
         State oldState = this.state;
         this.state = state;
         notifyListeners(oldState, state);

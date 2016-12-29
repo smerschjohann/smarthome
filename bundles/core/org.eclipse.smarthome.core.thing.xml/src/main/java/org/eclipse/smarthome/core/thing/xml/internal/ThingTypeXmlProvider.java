@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -67,7 +67,7 @@ public class ThingTypeXmlProvider implements XmlDocumentProvider<List<?>> {
 
     public ThingTypeXmlProvider(Bundle bundle, XmlConfigDescriptionProvider configDescriptionProvider,
             XmlThingTypeProvider thingTypeProvider, XmlChannelTypeProvider channelTypeProvider)
-                    throws IllegalArgumentException {
+            throws IllegalArgumentException {
 
         if (bundle == null) {
             throw new IllegalArgumentException("The Bundle must not be null!");
@@ -137,7 +137,7 @@ public class ThingTypeXmlProvider implements XmlDocumentProvider<List<?>> {
 
         // create channel group types
         for (ChannelGroupTypeXmlResult type : this.channelGroupTypeRefs) {
-            this.channelTypeProvider.addChannelGroupType(this.bundle, type.toChannelGroupType(channelTypes));
+            this.channelTypeProvider.addChannelGroupType(this.bundle, type.toChannelGroupType());
         }
 
         // create thing and bridge types

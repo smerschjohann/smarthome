@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -36,7 +36,7 @@ public class StateResponse extends Packet {
     private int brightness;
     private int kelvin;
     private int dim;
-    private PowerState power; // PowerState?
+    private PowerState power;
     private String label;
     private long tags;
 
@@ -104,7 +104,7 @@ public class StateResponse extends Packet {
     protected ByteBuffer packetBytes() {
         return ByteBuffer.allocate(packetLength()).put(FIELD_HUE.bytes(hue)).put(FIELD_SATURATION.bytes(saturation))
                 .put(FIELD_BRIGHTNESS.bytes(brightness)).put(FIELD_KELVIN.bytes(kelvin)).put(FIELD_DIM.bytes(dim))
-                .put(FIELD_POWER.bytes(hue)).put(FIELD_LABEL.bytes(label)).put(FIELD_TAGS.bytes(tags));
+                .put(FIELD_POWER.bytes(power.getValue())).put(FIELD_LABEL.bytes(label)).put(FIELD_TAGS.bytes(tags));
     }
 
     @Override

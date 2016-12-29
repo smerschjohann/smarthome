@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -64,10 +64,10 @@ public class MapTransformationServiceTest {
         Assert.assertEquals("zu", transformedResponse);
 
         Properties properties = new Properties();
-        try {
-            properties.load(new FileReader(USED_FILENAME));
+        try (FileReader reader = new FileReader(USED_FILENAME); FileWriter writer = new FileWriter(USED_FILENAME)) {
+            properties.load(reader);
             properties.setProperty(SOURCE_CLOSED, "changevalue");
-            properties.store(new FileWriter(USED_FILENAME), "");
+            properties.store(writer, "");
 
             // This tests that the requested transformation file has been removed from
             // the cache
@@ -81,7 +81,7 @@ public class MapTransformationServiceTest {
             }, 10000, 100);
 
             properties.setProperty(SOURCE_CLOSED, "zu");
-            properties.store(new FileWriter(USED_FILENAME), "");
+            properties.store(writer, "");
 
             waitForAssert(new Callable<Void>() {
                 @Override

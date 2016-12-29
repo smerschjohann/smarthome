@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,43 +10,44 @@ package org.eclipse.smarthome.io.net.http;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.List;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
-import org.apache.commons.httpclient.Header;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.URIException;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.DeleteMethod;
-import org.apache.commons.httpclient.methods.EntityEnclosingMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.InputStreamRequestEntity;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.PutMethod;
-import org.apache.commons.httpclient.params.HttpMethodParams;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.client.HttpProxy;
+import org.eclipse.jetty.client.ProxyConfiguration;
+import org.eclipse.jetty.client.ProxyConfiguration.Proxy;
+import org.eclipse.jetty.client.api.AuthenticationStore;
+import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.util.BasicAuthentication;
+import org.eclipse.jetty.client.util.InputStreamContentProvider;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.util.B64Code;
+import org.eclipse.jetty.util.StringUtil;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Some common methods to be used in both HTTP-In-Binding and HTTP-Out-Binding
  *
- * @author Thomas.Eichstaedt-Engelen
+ * @author Thomas Eichstaedt-Engelen
  * @author Kai Kreuzer - Initial contribution and API
+ * @author Svilen Valkanov - replaced Apache HttpClient with Jetty
  */
 public class HttpUtil {
 
-    /** {@link Pattern} which matches the credentials out of an URL */
-    private static final Pattern URL_CREDENTIALS_PATTERN = Pattern.compile("http://(.*?):(.*?)@.*");
+    private static Logger logger = LoggerFactory.getLogger(HttpUtil.class);
+
+    private static HttpClient client = new HttpClient(new SslContextFactory());
 
     /**
      * Executes the given <code>url</code> with the given <code>httpMethod</code>.
@@ -58,8 +59,9 @@ public class HttpUtil {
      * @param timeout the socket timeout to wait for data
      *
      * @return the response body or <code>NULL</code> when the request went wrong
+     * @throws IOException when the request execution failed, timed out or it was interrupted
      */
-    public static String executeUrl(String httpMethod, String url, int timeout) {
+    public static String executeUrl(String httpMethod, String url, int timeout) throws IOException {
         return executeUrl(httpMethod, url, null, null, timeout);
     }
 
@@ -76,9 +78,10 @@ public class HttpUtil {
      * @param timeout the socket timeout to wait for data
      *
      * @return the response body or <code>NULL</code> when the request went wrong
+     * @throws IOException when the request execution failed, timed out or it was interrupted
      */
-    public static String executeUrl(String httpMethod, String url, InputStream content, String contentType,
-            int timeout) {
+    public static String executeUrl(String httpMethod, String url, InputStream content, String contentType, int timeout)
+            throws IOException {
 
         return executeUrl(httpMethod, url, null, content, contentType, timeout);
     }
@@ -97,9 +100,10 @@ public class HttpUtil {
      * @param timeout the socket timeout to wait for data
      *
      * @return the response body or <code>NULL</code> when the request went wrong
+     * @throws IOException when the request execution failed, timed out or it was interrupted
      */
     public static String executeUrl(String httpMethod, String url, Properties httpHeaders, InputStream content,
-            String contentType, int timeout) {
+            String contentType, int timeout) throws IOException {
         String proxySet = System.getProperty("http.proxySet");
 
         String proxyHost = null;
@@ -115,8 +119,7 @@ public class HttpUtil {
                 try {
                     proxyPort = Integer.valueOf(proxyPortString);
                 } catch (NumberFormatException e) {
-                    LoggerFactory.getLogger(HttpUtil.class)
-                            .warn("'{}' is not a valid proxy port - using port 80 instead");
+                    logger.warn("'{}' is not a valid proxy port - using port 80 instead");
                 }
             }
             proxyUser = System.getProperty("http.proxyUser");
@@ -145,73 +148,98 @@ public class HttpUtil {
      * @param proxyPassword the password to authenticate with the proxy
      * @param nonProxyHosts the hosts that won't be routed through the proxy
      * @return the response body or <code>NULL</code> when the request went wrong
+     * @throws IOException when the request execution failed, timed out or it was interrupted
      */
     public static String executeUrl(String httpMethod, String url, Properties httpHeaders, InputStream content,
             String contentType, int timeout, String proxyHost, Integer proxyPort, String proxyUser,
-            String proxyPassword, String nonProxyHosts) {
+            String proxyPassword, String nonProxyHosts) throws IOException {
 
-        HttpClient client = new HttpClient();
+        startHttpClient(client);
 
+        HttpProxy proxy = null;
         // only configure a proxy if a host is provided
         if (StringUtils.isNotBlank(proxyHost) && proxyPort != null && shouldUseProxy(url, nonProxyHosts)) {
-            client.getHostConfiguration().setProxy(proxyHost, proxyPort);
-            if (StringUtils.isNotBlank(proxyUser)) {
-                client.getState().setProxyCredentials(AuthScope.ANY,
-                        new UsernamePasswordCredentials(proxyUser, proxyPassword));
-            }
+            AuthenticationStore authStore = client.getAuthenticationStore();
+            ProxyConfiguration proxyConfig = client.getProxyConfiguration();
+            List<Proxy> proxies = proxyConfig.getProxies();
+
+            proxy = new HttpProxy(proxyHost, proxyPort);
+            proxies.add(proxy);
+
+            // This value is a replacement for any realm
+            final String anyRealm = "*";
+            authStore.addAuthentication(new BasicAuthentication(proxy.getURI(), anyRealm, proxyUser, proxyPassword) {
+
+                // In version 9.2.12 Jetty HttpClient does not support adding an authentication for any realm. This is a
+                // workaround until this issue is solved
+                @Override
+                public boolean matches(String type, URI uri, String realm) {
+                    realm = anyRealm;
+                    return super.matches(type, uri, realm);
+                }
+            });
         }
 
-        HttpMethod method = HttpUtil.createHttpMethod(httpMethod, url);
-        method.getParams().setSoTimeout(timeout);
-        method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER, new DefaultHttpMethodRetryHandler(3, false));
+        HttpMethod method = HttpUtil.createHttpMethod(httpMethod);
+
+        Request request = client.newRequest(url).method(method).timeout(timeout, TimeUnit.MILLISECONDS);
+
         if (httpHeaders != null) {
             for (String httpHeaderKey : httpHeaders.stringPropertyNames()) {
-                method.addRequestHeader(new Header(httpHeaderKey, httpHeaders.getProperty(httpHeaderKey)));
+                request.header(httpHeaderKey, httpHeaders.getProperty(httpHeaderKey));
             }
         }
+
+        // add basic auth header, if url contains user info
+        try {
+            URI uri = new URI(url);
+            if (uri.getUserInfo() != null) {
+                String[] userInfo = uri.getUserInfo().split(":");
+
+                String user = userInfo[0];
+                String password = userInfo[1];
+
+                String basicAuthentication = "Basic " + B64Code.encode(user + ":" + password, StringUtil.__ISO_8859_1);
+                request.header(HttpHeader.AUTHORIZATION, basicAuthentication);
+            }
+        } catch (URISyntaxException e) {
+            logger.debug("String {} can not be parsed as URI reference", url);
+        }
+
         // add content if a valid method is given ...
-        if (method instanceof EntityEnclosingMethod && content != null) {
-            EntityEnclosingMethod eeMethod = (EntityEnclosingMethod) method;
-            eeMethod.setRequestEntity(new InputStreamRequestEntity(content, contentType));
+        if (content != null && (method.equals(HttpMethod.POST) || method.equals(HttpMethod.PUT))) {
+            request.content(new InputStreamContentProvider(content), contentType);
         }
 
-        Credentials credentials = extractCredentials(url);
-        if (credentials != null) {
-            client.getParams().setAuthenticationPreemptive(true);
-            client.getState().setCredentials(AuthScope.ANY, credentials);
-        }
-
-        Logger logger = LoggerFactory.getLogger(HttpUtil.class);
         if (logger.isDebugEnabled()) {
-            try {
-                logger.debug("About to execute '" + method.getURI().toString() + "'");
-            } catch (URIException e) {
-                logger.debug(e.getMessage());
-            }
+            logger.debug("About to execute {}", request.getURI());
         }
 
         try {
-
-            int statusCode = client.executeMethod(method);
-            if (statusCode >= HttpStatus.SC_BAD_REQUEST) {
-                logger.debug("Method failed: " + method.getStatusLine());
+            ContentResponse response = request.send();
+            int statusCode = response.getStatus();
+            if (statusCode >= HttpStatus.BAD_REQUEST_400) {
+                String statusLine = statusCode + " " + response.getReason();
+                logger.debug("Method failed: {}", statusLine);
             }
 
-            String responseBody = IOUtils.toString(method.getResponseBodyAsStream());
+            byte[] rawResponse = response.getContent();
+            String encoding = response.getEncoding() != null ? response.getEncoding().replaceAll("\"", "").trim()
+                    : "UTF-8";
+            String responseBody = new String(rawResponse, encoding);
             if (!responseBody.isEmpty()) {
                 logger.trace(responseBody);
             }
 
             return responseBody;
-        } catch (HttpException he) {
-            logger.error("Fatal protocol violation: {}", he.toString());
-        } catch (IOException ioe) {
-            logger.error("Fatal transport error: {}", ioe.toString());
+        } catch (Exception e) {
+            throw new IOException(e);
         } finally {
-            method.releaseConnection();
+            if (proxy != null) {
+                // Remove the proxy, that has been added for this request
+                client.getProxyConfiguration().getProxies().remove(proxy);
+            }
         }
-
-        return null;
     }
 
     /**
@@ -233,7 +261,7 @@ public class HttpUtil {
                 URL url = new URL(urlString);
                 givenHost = url.getHost();
             } catch (MalformedURLException e) {
-                LoggerFactory.getLogger(HttpUtil.class).error("the given url {} is malformed", urlString);
+                logger.error("the given url {} is malformed", urlString);
             }
 
             String[] hosts = nonProxyHosts.split("\\|");
@@ -258,63 +286,36 @@ public class HttpUtil {
     }
 
     /**
-     * Extracts username and password from the given <code>url</code>. A valid
-     * url to extract {@link Credentials} from looks like:
-     *
-     * <pre>
-     * http://username:password@www.domain.org
-     * </pre>
-     *
-     * @param url the URL to extract {@link Credentials} from
-     *
-     * @return the exracted Credentials or <code>null</code> if the given <code>url</code> does not contain credentials
-     */
-    protected static Credentials extractCredentials(String url) {
-
-        Matcher matcher = URL_CREDENTIALS_PATTERN.matcher(url);
-
-        if (matcher.matches()) {
-
-            matcher.reset();
-
-            String username = "";
-            String password = "";
-
-            while (matcher.find()) {
-                username = matcher.group(1);
-                password = matcher.group(2);
-            }
-
-            Credentials credentials = new UsernamePasswordCredentials(username, password);
-            return credentials;
-        }
-
-        return null;
-    }
-
-    /**
      * Factory method to create a {@link HttpMethod}-object according to the
-     * given String <code>httpMethod</code>
+     * given String <code>httpMethodString</code>
      *
      * @param httpMethodString the name of the {@link HttpMethod} to create
-     * @param url
      *
-     * @return an object of type {@link GetMethod}, {@link PutMethod}, {@link PostMethod} or {@link DeleteMethod}
      * @throws IllegalArgumentException if <code>httpMethod</code> is none of <code>GET</code>, <code>PUT</code>,
      *             <code>POST</POST> or <code>DELETE</code>
      */
-    public static HttpMethod createHttpMethod(String httpMethodString, String url) {
+    public static HttpMethod createHttpMethod(String httpMethodString) {
 
         if ("GET".equals(httpMethodString)) {
-            return new GetMethod(url);
+            return HttpMethod.GET;
         } else if ("PUT".equals(httpMethodString)) {
-            return new PutMethod(url);
+            return HttpMethod.PUT;
         } else if ("POST".equals(httpMethodString)) {
-            return new PostMethod(url);
+            return HttpMethod.POST;
         } else if ("DELETE".equals(httpMethodString)) {
-            return new DeleteMethod(url);
+            return HttpMethod.DELETE;
         } else {
             throw new IllegalArgumentException("given httpMethod '" + httpMethodString + "' is unknown");
+        }
+    }
+
+    private static void startHttpClient(HttpClient client) {
+        if (!client.isStarted()) {
+            try {
+                client.start();
+            } catch (Exception e) {
+                logger.warn("Cannot start HttpClient!", e);
+            }
         }
     }
 

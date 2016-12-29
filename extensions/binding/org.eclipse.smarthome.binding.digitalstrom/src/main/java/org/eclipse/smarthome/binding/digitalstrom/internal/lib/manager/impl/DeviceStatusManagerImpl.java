@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -292,7 +292,7 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
                 newAngle = device.getAnglePosition();
             }
             DeviceStateUpdate nextDeviceStateUpdate = device.getNextDeviceUpdateState();
-            while (nextDeviceStateUpdate != null && nextDeviceStateUpdate.getType() == stateUpdateType) {
+            while (nextDeviceStateUpdate != null && nextDeviceStateUpdate.getType().equals(stateUpdateType)) {
                 switch (stateUpdateType) {
                     case DeviceStateUpdate.UPDATE_BRIGHTNESS:
                         deviceStateUpdate = nextDeviceStateUpdate;

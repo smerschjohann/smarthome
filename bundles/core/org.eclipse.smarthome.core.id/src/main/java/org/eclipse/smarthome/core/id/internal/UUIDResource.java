@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,12 +7,14 @@
  */
 package org.eclipse.smarthome.core.id.internal;
 
+import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.eclipse.smarthome.core.auth.Role;
 import org.eclipse.smarthome.core.id.InstanceUUID;
 import org.eclipse.smarthome.io.rest.RESTResource;
 
@@ -28,6 +30,7 @@ import io.swagger.annotations.ApiResponses;
  */
 @Path(UUIDResource.PATH_UUID)
 @Api(value = UUIDResource.PATH_UUID)
+@RolesAllowed({ Role.ADMIN })
 public class UUIDResource implements RESTResource {
 
     public static final String PATH_UUID = "uuid";

@@ -17,19 +17,16 @@ import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
 import org.eclipse.smarthome.automation.RuleStatus;
 import org.eclipse.smarthome.automation.RuleStatusInfo;
-import org.eclipse.smarthome.automation.template.Template;
+import org.eclipse.smarthome.automation.template.RuleTemplate;
 import org.eclipse.smarthome.automation.template.TemplateRegistry;
+import org.eclipse.smarthome.automation.type.ActionType;
+import org.eclipse.smarthome.automation.type.ConditionType;
 import org.eclipse.smarthome.automation.type.ModuleType;
 import org.eclipse.smarthome.automation.type.ModuleTypeRegistry;
+import org.eclipse.smarthome.automation.type.TriggerType;
 import org.eclipse.smarthome.io.console.Console;
 import org.eclipse.smarthome.io.console.extensions.ConsoleCommandExtension;
-import org.osgi.framework.BundleContext;
-import org.osgi.framework.Filter;
-import org.osgi.framework.InvalidSyntaxException;
-import org.osgi.framework.ServiceReference;
-import org.osgi.framework.ServiceRegistration;
-import org.osgi.util.tracker.ServiceTracker;
-import org.osgi.util.tracker.ServiceTrackerCustomizer;
+import org.osgi.service.component.ComponentContext;
 
 /**
  * This class provides functionality for defining and executing automation commands for importing, exporting, removing
@@ -39,9 +36,7 @@ import org.osgi.util.tracker.ServiceTrackerCustomizer;
  * @author Kai Kreuzer - refactored (managed) provider and registry implementation
  *
  */
-@SuppressWarnings("rawtypes")
-public class AutomationCommandsPluggable extends AutomationCommands
-        implements ServiceTrackerCustomizer, ConsoleCommandExtension {
+public class AutomationCommandsPluggable extends AutomationCommands implements ConsoleCommandExtension {
 
     /**
      * This constant defines the command group name.
@@ -61,7 +56,7 @@ public class AutomationCommandsPluggable extends AutomationCommands
     /**
      * This field holds the reference to the {@code TemplateRegistry} providing the {@code Template} automation objects.
      */
-    static TemplateRegistry templateRegistry;
+    static TemplateRegistry<RuleTemplate> templateRegistry;
 
     /**
      * This field holds the reference to the {@code ModuleTypeRegistry} providing the {@code ModuleType} automation
@@ -88,84 +83,58 @@ public class AutomationCommandsPluggable extends AutomationCommands
     private static final int RULE_REGISTRY = 1;
 
     /**
-     * This field holds a reference to the tracker for {@code RuleRegistry}, {@code TemplateRegistry} and
-     * {@code ModuleTypeRegistry}.
-     */
-    private ServiceTracker tracker;
-
-    /**
-     * This field holds a reference to the {@code ServiceRegistration} of the Automation Console Commands service.
-     */
-    private ServiceRegistration commandsServiceReg;
-
-    /**
-     * This constructor is responsible for creating a tracker for {@code RuleRegistry}, {@code TemplateRegistry} and
-     * {@code ModuleTypeRegistry}. Also it registers the Automation Console Commands service.
+     * Activating this component - called from DS.
      *
-     * @param bc is the bundle's execution context within the Framework.
+     * @param componentContext
      */
-    @SuppressWarnings("unchecked")
-    public AutomationCommandsPluggable(BundleContext bc) {
-        this.bc = bc;
-        moduleTypeProvider = new CommandlineModuleTypeProvider(bc);
-        templateProvider = new CommandlineTemplateProvider(bc);
-        ruleImporter = new CommandlineRuleImporter(bc);
-        try {
-            Filter filter = bc.createFilter("(|(objectClass=" + RuleRegistry.class.getName() + ")(objectClass="
-                    + TemplateRegistry.class.getName() + ")(objectClass=" + ModuleTypeRegistry.class.getName() + "))");
-            tracker = new ServiceTracker(bc, filter, this);
-            tracker.open();
-        } catch (InvalidSyntaxException e) {
-            e.printStackTrace();
-        }
-        commandsServiceReg = bc.registerService(ConsoleCommandExtension.class.getName(), this, null);
+    protected void activate(ComponentContext componentContext) {
+        super.initialize(componentContext.getBundleContext());
     }
 
     /**
-     * This method extends the parent functionality with unregistering the Automation Console Commands service and
-     * stopping the tracker for {@code RuleRegistry}, {@code TemplateRegistry} and {@code ModuleTypeRegistry}.
+     * Deactivating this component - called from DS.
      */
-    @Override
-    public void stop() {
-        commandsServiceReg.unregister();
-        if (tracker != null) {
-            tracker.close();
-            tracker = null;
-        }
-        super.stop();
+    protected void deactivate(ComponentContext componentContext) {
+        super.dispose();
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public Object addingService(ServiceReference reference) {
-        Object service = bc.getService(reference);
-        if (service instanceof TemplateRegistry) {
-            AutomationCommandsPluggable.templateRegistry = (TemplateRegistry) service;
-        }
-        if (service instanceof RuleRegistry) {
-            AutomationCommandsPluggable.ruleRegistry = (RuleRegistry) service;
-        }
-        if (service instanceof ModuleTypeRegistry) {
-            AutomationCommandsPluggable.moduleTypeRegistry = (ModuleTypeRegistry) service;
-        }
-        return service;
+    /**
+     * Bind the {@link RuleRegistry} service - called from DS.
+     *
+     * @param ruleRegistry ruleRegistry service.
+     */
+    protected void setRuleRegistry(RuleRegistry ruleRegistry) {
+        AutomationCommandsPluggable.ruleRegistry = ruleRegistry;
     }
 
-    @Override
-    public void modifiedService(ServiceReference reference, Object service) {
+    /**
+     * Bind the {@link ModuleTypeRegistry} service - called from DS.
+     *
+     * @param moduleTypeRegistry moduleTypeRegistry service.
+     */
+    protected void setModuleTypeRegistry(ModuleTypeRegistry moduleTypeRegistry) {
+        AutomationCommandsPluggable.moduleTypeRegistry = moduleTypeRegistry;
     }
 
-    @Override
-    public void removedService(ServiceReference reference, Object service) {
-        if (service == templateRegistry) {
-            templateRegistry = null;
-        }
-        if (service == ruleRegistry) {
-            ruleRegistry = null;
-        }
-        if (service == moduleTypeRegistry) {
-            moduleTypeRegistry = null;
-        }
+    /**
+     * Bind the {@link TemplateRegistry} service - called from DS.
+     *
+     * @param templateRegistry templateRegistry service.
+     */
+    protected void setTemplateRegistry(TemplateRegistry<RuleTemplate> templateRegistry) {
+        AutomationCommandsPluggable.templateRegistry = templateRegistry;
+    }
+
+    protected void unsetRuleRegistry(RuleRegistry ruleRegistry) {
+        AutomationCommandsPluggable.ruleRegistry = null;
+    }
+
+    protected void unsetModuleTypeRegistry(ModuleTypeRegistry moduleTypeRegistry) {
+        AutomationCommandsPluggable.moduleTypeRegistry = null;
+    }
+
+    protected void unsetTemplateRegistry(TemplateRegistry<RuleTemplate> templateRegistry) {
+        AutomationCommandsPluggable.templateRegistry = null;
     }
 
     @Override
@@ -246,7 +215,7 @@ public class AutomationCommandsPluggable extends AutomationCommands
     }
 
     @Override
-    public Template getTemplate(String templateUID, Locale locale) {
+    public RuleTemplate getTemplate(String templateUID, Locale locale) {
         if (templateRegistry != null) {
             return templateRegistry.get(templateUID, locale);
         }
@@ -254,7 +223,7 @@ public class AutomationCommandsPluggable extends AutomationCommands
     }
 
     @Override
-    public Collection<Template> getTemplates(Locale locale) {
+    public Collection<RuleTemplate> getTemplates(Locale locale) {
         if (templateRegistry != null) {
             return templateRegistry.getAll(locale);
         }
@@ -269,10 +238,29 @@ public class AutomationCommandsPluggable extends AutomationCommands
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends ModuleType> Collection<T> getModuleTypes(Class<T> clazz, Locale locale) {
+    public Collection<TriggerType> getTriggers(Locale locale) {
         if (moduleTypeRegistry != null) {
-            return moduleTypeRegistry.getAll(clazz, locale);
+            return moduleTypeRegistry.getTriggers(locale);
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<ConditionType> getConditions(Locale locale) {
+        if (moduleTypeRegistry != null) {
+            return moduleTypeRegistry.getConditions(locale);
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<ActionType> getActions(Locale locale) {
+        if (moduleTypeRegistry != null) {
+            return moduleTypeRegistry.getActions(locale);
         }
         return null;
     }
@@ -391,7 +379,7 @@ public class AutomationCommandsPluggable extends AutomationCommands
     @Override
     public RuleStatus getRuleStatus(String ruleUID) {
         if (ruleRegistry != null) {
-            RuleStatusInfo rsi = ruleRegistry.getStatus(ruleUID);
+            RuleStatusInfo rsi = ruleRegistry.getStatusInfo(ruleUID);
             return rsi != null ? rsi.getStatus() : null;
         } else {
             return null;

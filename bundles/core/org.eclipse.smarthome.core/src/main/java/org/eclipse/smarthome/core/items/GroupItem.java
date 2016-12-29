@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -25,6 +25,8 @@ import com.google.common.collect.ImmutableSet;
 
 public class GroupItem extends GenericItem implements StateChangeListener {
 
+    public static final String TYPE = "Group";
+
     private final Logger logger = LoggerFactory.getLogger(GroupItem.class);
 
     protected final GenericItem baseItem;
@@ -42,7 +44,7 @@ public class GroupItem extends GenericItem implements StateChangeListener {
     }
 
     public GroupItem(String name, GenericItem baseItem, GroupFunction function) {
-        super("Group", name);
+        super(TYPE, name);
         members = new CopyOnWriteArraySet<Item>();
         this.function = function;
         this.baseItem = baseItem;
@@ -55,8 +57,17 @@ public class GroupItem extends GenericItem implements StateChangeListener {
      *
      * @return the base item of this GroupItem
      */
-    public GenericItem getBaseItem() {
+    public Item getBaseItem() {
         return baseItem;
+    }
+
+    /**
+     * Returns the function of this {@link GroupItem}.
+     *
+     * @return the function of this GroupItem
+     */
+    public GroupFunction getFunction() {
+        return function;
     }
 
     /**

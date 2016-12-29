@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 1997, 2015 by ProSyst Software GmbH and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -68,7 +68,7 @@ public class ModuleTypeGSONParser extends AbstractGSONParser<ModuleType> {
                     if (children != null && !children.isEmpty()) {
                         result.add(mt);
                     } else {
-                        result.add(new TriggerType(mt.getUID(), mt.getConfigurationDescription(), mt.getLabel(),
+                        result.add(new TriggerType(mt.getUID(), mt.getConfigurationDescriptions(), mt.getLabel(),
                                 mt.getDescription(), mt.getTags(), mt.getVisibility(),
                                 ((TriggerType) mt).getOutputs()));
                     }
@@ -78,7 +78,7 @@ public class ModuleTypeGSONParser extends AbstractGSONParser<ModuleType> {
                     if (children != null && !children.isEmpty()) {
                         result.add(mt);
                     } else {
-                        result.add(new ConditionType(mt.getUID(), mt.getConfigurationDescription(), mt.getLabel(),
+                        result.add(new ConditionType(mt.getUID(), mt.getConfigurationDescriptions(), mt.getLabel(),
                                 mt.getDescription(), mt.getTags(), mt.getVisibility(),
                                 ((ConditionType) mt).getInputs()));
                     }
@@ -88,7 +88,7 @@ public class ModuleTypeGSONParser extends AbstractGSONParser<ModuleType> {
                     if (children != null && !children.isEmpty()) {
                         result.add(mt);
                     } else {
-                        result.add(new ActionType(mt.getUID(), mt.getConfigurationDescription(), mt.getLabel(),
+                        result.add(new ActionType(mt.getUID(), mt.getConfigurationDescriptions(), mt.getLabel(),
                                 mt.getDescription(), mt.getTags(), mt.getVisibility(), ((ActionType) mt).getInputs(),
                                 ((ActionType) mt).getOutputs()));
                     }

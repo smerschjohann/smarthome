@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -25,7 +25,6 @@ import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingStatus;
 import org.eclipse.smarthome.core.thing.ThingStatusDetail;
-import org.eclipse.smarthome.core.thing.ThingStatusInfo;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
@@ -61,14 +60,14 @@ public class HueLightHandler extends BaseThingHandler implements LightStatusList
 
     public final static Set<ThingTypeUID> SUPPORTED_THING_TYPES = Sets.newHashSet(THING_TYPE_COLOR_LIGHT,
             THING_TYPE_COLOR_TEMPERATURE_LIGHT, THING_TYPE_DIMMABLE_LIGHT, THING_TYPE_EXTENDED_COLOR_LIGHT,
-            THING_TYPE_ON_OFF_LIGHT);
+            THING_TYPE_ON_OFF_LIGHT, THING_TYPE_ON_OFF_PLUG, THING_TYPE_DIMMABLE_PLUG);
 
     private final static Map<String, List<String>> VENDOR_MODEL_MAP = new ImmutableMap.Builder<String, List<String>>()
             .put("Philips",
                     Lists.newArrayList("LCT001", "LCT002", "LCT003", "LCT007", "LLC001", "LLC006", "LLC007", "LLC010",
                             "LLC011", "LLC012", "LLC013", "LLC020", "LST001", "LST002", "LWB004", "LWB006", "LWB007",
                             "LWL001"))
-            .put("OSRAM", Lists.newArrayList("Classic_A60_RGBW", "PAR16_50_TW", "Surface_Light_TW")).build();
+            .put("OSRAM", Lists.newArrayList("Classic_A60_RGBW", "PAR16_50_TW", "Surface_Light_TW", "Plug_01")).build();
 
     private final static String OSRAM_PAR16_50_TW_MODEL_ID = "PAR16_50_TW";
 
@@ -84,6 +83,8 @@ public class HueLightHandler extends BaseThingHandler implements LightStatusList
     // Flag to indicate whether the bulb is of type Osram par16 50 TW or not
     private boolean isOsramPar16 = false;
 
+    private boolean propertiesInitializedSuccessfully = false;
+
     private HueBridgeHandler bridgeHandler;
 
     ScheduledFuture<?> scheduledFuture;
@@ -95,37 +96,45 @@ public class HueLightHandler extends BaseThingHandler implements LightStatusList
     @Override
     public void initialize() {
         logger.debug("Initializing hue light handler.");
+        initializeThing((getBridge() == null) ? null : getBridge().getStatus());
+    }
+
+    private void initializeThing(ThingStatus bridgeStatus) {
+        logger.debug("initializeThing thing {} bridge status {}", getThing().getUID(), bridgeStatus);
         final String configLightId = (String) getConfig().get(LIGHT_ID);
         if (configLightId != null) {
             lightId = configLightId;
             // note: this call implicitly registers our handler as a listener on
             // the bridge
             if (getHueBridgeHandler() != null) {
-                ThingStatusInfo statusInfo = getBridge().getStatusInfo();
-                updateStatus(statusInfo.getStatus(), statusInfo.getStatusDetail(), statusInfo.getDescription());
-                updateProperties();
+                if (bridgeStatus == ThingStatus.ONLINE) {
+                    updateStatus(ThingStatus.ONLINE);
+                    initializeProperties();
+                } else {
+                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
+                }
+            } else {
+                updateStatus(ThingStatus.OFFLINE);
             }
+        } else {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR);
         }
     }
 
-    private void updateProperties() {
-        FullLight fullLight = getLight();
-        if (fullLight != null) {
-            String modelId = fullLight.getModelID().replaceAll(NORMALIZE_ID_REGEX, "_");
-            updateProperty(Thing.PROPERTY_MODEL_ID, modelId);
-            updateProperty(Thing.PROPERTY_FIRMWARE_VERSION, fullLight.getSoftwareVersion());
-            String vendor = getVendor(modelId);
-            if (vendor != null) {
-                updateProperty(Thing.PROPERTY_VENDOR, vendor);
+    private synchronized void initializeProperties() {
+        if (!propertiesInitializedSuccessfully) {
+            FullLight fullLight = getLight();
+            if (fullLight != null) {
+                String modelId = fullLight.getModelID().replaceAll(NORMALIZE_ID_REGEX, "_");
+                updateProperty(Thing.PROPERTY_MODEL_ID, modelId);
+                updateProperty(Thing.PROPERTY_FIRMWARE_VERSION, fullLight.getSoftwareVersion());
+                String vendor = getVendor(modelId);
+                if (vendor != null) {
+                    updateProperty(Thing.PROPERTY_VENDOR, vendor);
+                }
+                isOsramPar16 = OSRAM_PAR16_50_TW_MODEL_ID.equals(modelId);
+                propertiesInitializedSuccessfully = true;
             }
-            isOsramPar16 = OSRAM_PAR16_50_TW_MODEL_ID.equals(modelId);
-        }
-    }
-
-    @Override
-    public void bridgeStatusChanged(ThingStatusInfo bridgeStatusInfo) {
-        if (bridgeStatusInfo.getStatus() == ThingStatus.ONLINE) {
-            updateProperties();
         }
     }
 
@@ -144,7 +153,8 @@ public class HueLightHandler extends BaseThingHandler implements LightStatusList
         if (lightId != null) {
             HueBridgeHandler bridgeHandler = getHueBridgeHandler();
             if (bridgeHandler != null) {
-                getHueBridgeHandler().unregisterLightStatusListener(this);
+                bridgeHandler.unregisterLightStatusListener(this);
+                this.bridgeHandler = null;
             }
             lightId = null;
         }
@@ -341,6 +351,9 @@ public class HueLightHandler extends BaseThingHandler implements LightStatusList
     @Override
     public void onLightStateChanged(HueBridge bridge, FullLight fullLight) {
         if (fullLight != null && fullLight.getId().equals(lightId)) {
+
+            initializeProperties();
+
             lastSentColorTemp = null;
             lastSentBrightness = null;
 

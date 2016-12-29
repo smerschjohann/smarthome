@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,9 +9,11 @@ package org.eclipse.smarthome.core.thing.link;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.smarthome.core.common.registry.AbstractRegistry;
+import org.eclipse.smarthome.core.common.registry.Provider;
 import org.eclipse.smarthome.core.thing.UID;
 
 /**
@@ -23,7 +25,12 @@ import org.eclipse.smarthome.core.thing.UID;
  * @param <L>
  *            Concrete type of the abstract link
  */
-public abstract class AbstractLinkRegistry<L extends AbstractLink> extends AbstractRegistry<L, String> {
+public abstract class AbstractLinkRegistry<L extends AbstractLink, P extends Provider<L>>
+        extends AbstractRegistry<L, String, P> {
+
+    protected AbstractLinkRegistry(final Class<P> providerClazz) {
+        super(providerClazz);
+    }
 
     /**
      * Returns if an item for a given item name is linked to a channel or thing for a
@@ -47,13 +54,12 @@ public abstract class AbstractLinkRegistry<L extends AbstractLink> extends Abstr
     }
 
     /**
-     * Returns the item name, which is bound to the given UID.
+     * Returns the item names, which are bound to the given UID.
      *
-     * @param uid
-     *            UID
-     * @return item name or null if no item is bound to the given UID
+     * @param uid UID
+     * @return a non-null collection of item names that are linked to the given UID.
      */
-    public Set<String> getLinkedItems(UID uid) {
+    public Set<String> getLinkedItemNames(UID uid) {
         Set<String> linkedItems = new LinkedHashSet<>();
         for (AbstractLink link : getAll()) {
             if (link.getUID().equals(uid)) {
@@ -80,13 +86,15 @@ public abstract class AbstractLinkRegistry<L extends AbstractLink> extends Abstr
     }
 
     @Override
-    public L get(String key) {
-        Collection<L> links = getAll();
-        for (L link : links) {
-            if (link.getID().equals(key)) {
-                return link;
+    public L get(final String key) {
+        for (final Map.Entry<Provider<L>, Collection<L>> entry : elementMap.entrySet()) {
+            for (final L link : entry.getValue()) {
+                if (key.equals(link.getID())) {
+                    return link;
+                }
             }
         }
         return null;
     }
+
 }

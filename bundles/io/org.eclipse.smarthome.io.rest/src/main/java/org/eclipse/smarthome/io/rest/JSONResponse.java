@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,6 +13,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.ext.Provider;
 
+import org.eclipse.smarthome.core.library.types.DateTimeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +36,8 @@ public class JSONResponse {
     // also dump stacktrace?
     private final static boolean WITH_STACKTRACE = false;
 
-    final static Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    final static Gson GSON = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS)
+            .setPrettyPrinting().create();
 
     /**
      * hide ctor a bit from public
@@ -56,7 +58,7 @@ public class JSONResponse {
     /**
      * setup JSON depending on the content
      *
-     * @param message
+     * @param message a message (may be null)
      * @param status
      * @param entity
      * @param ex
@@ -118,7 +120,7 @@ public class JSONResponse {
      *
      * @param status
      * @param entity
-     * @param errormessage
+     * @param errormessage an optional error message (may be null), ignored if the status family is successful
      * @return Response configure for error or success
      */
     public static Response createResponse(Response.Status status, Object entity, String errormessage) {

@@ -13,17 +13,19 @@
 		<div class="container">
 			<p class="text-center" ng-show="data.rules.length == 0">No rules defined yet.</p>
 			<div class="groups">
-				<div class="clickable" ng-repeat="rule in data.rules | orderBy:'uid'" ng-click="navigateTo('view/' + rule.uid)">
+				<div class="clickable" ng-repeat="rule in data.rules | orderBy:'uid'" ng-click="configure(rule, $event)">
 					<div class="rule fab-item text-left">
 						<div class="circle">{{rule.name.substring(0,1)}}</div>
 						<div class="item-content">
-							<h3>{{rule.name}}</h3>
-							<p ng-bind-html="rule.description"></p>
-							<p>{{rule.uid}}</p>
-							<div class="actions">
-								<md-button ng-click="toggleEnabled(rule, $event)" aria-label="Toggle Enable"> <i class="material-icons">{{rule.enabled ? "alarm_on" : "alarm_off"}}</i></md-button>
-								<md-button ng-click="configure(rule, $event)" aria-label="Configure"> <i class="material-icons">settings</i></md-button>
-								<md-button ng-click="remove(rule, $event)" aria-label="Remove"> <i class="material-icons">delete</i></md-button>
+							<div flex="60">
+								<h3>
+									{{rule.name}} <small class="badge" ng-class="rule.status.status.toLowerCase()">{{rule.status.status}}</small>
+								</h3>
+								<p ng-bind-html="rule.description"></p>
+								<p>{{rule.uid}}</p>
+							</div>
+							<div class="actions" flex="40">
+								<i class="material-icons" aria-label="Toggle Enable" ng-click="toggleEnabled(rule, $event)">{{rule.enabled ? "alarm_on" : "alarm_off"}}</i> <i class="material-icons" aria-label="Remove" ng-click="remove(rule, $event)">delete</i>
 							</div>
 						</div>
 						<hr class="border-line" ng-show="!$last" />
@@ -32,24 +34,9 @@
 			</div>
 		</div>
 	</div>
-	<div class="rules white-bg" ng-if="page === 'view'" ng-controller="ViewRuleController">
-		<div class="header-toolbar">
-			<md-button ng-click="navigateTo('')" aria-label="Refresh"> <i class="material-icons">close</i></md-button>
-		</div>
-		<div class="section-header">
-			<div class="container">
-				<div class="toolbar">
-					<md-button class="md-fab" ng-click="navigateTo('')" aria-label="Back"> <i class="material-icons">chevron_left</i></md-button>
-				</div>
-			</div>
-		</div>
-		<div class="container">
-			<pre>{{rule | json}}</pre>
-		</div>
-	</div>
 
 	<!-- Config block -->
-	<div class="rules white-bg" ng-if="page === 'configure' || page ==='new' " ng-controller="NewRuleController">
+	<div class="rules white-bg" ng-if="page === 'configure' || page ==='new'" ng-controller="NewRuleController">
 		<div class="header-toolbar">
 			<md-button ng-click="navigateTo('')" aria-label="Refresh"> <i class="material-icons">close</i></md-button>
 		</div>
@@ -61,7 +48,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="container" style="margin-left: 20px;">
+		<div class="container rules-container">
 			<div class="bindings row">
 				<div class="row">
 					<div class="ruleNameDesc">
@@ -70,6 +57,10 @@
 						<input type="hidden" ng-value="id" />
 					</div>
 				</div>
+				<p ng-if="status" class="ruleStatus">
+					Status:
+					<span class="badge" ng-class="status.status.toLowerCase()">{{status.status}} {{status.statusDetail !== 'NONE' ? ' - ' + status.statusDetail : ''}}</span>
+				</p>
 				<div class="row">
 					<div class="col-md-5 item-wrapper">
 						<h3 class="md-title md-title-nospace">

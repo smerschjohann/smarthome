@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -71,9 +71,9 @@ public class ScaleTransformationService extends AbstractFileTransformationServic
 
     @Override
     protected Map<Range, String> internalLoadTransform(String filename) throws TransformationException {
-        try {
+        try (FileReader reader = new FileReader(filename)) {
             final Properties properties = new Properties();
-            properties.load(new FileReader(filename));
+            properties.load(reader);
             final Map<Range, String> data = new HashMap<>();
 
             for (Entry<Object, Object> f : properties.entrySet()) {

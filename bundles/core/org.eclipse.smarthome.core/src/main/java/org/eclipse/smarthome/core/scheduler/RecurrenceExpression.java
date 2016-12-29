@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -326,7 +326,7 @@ import org.slf4j.LoggerFactory;
  * arrive at "every other year". Then, "BYMONTH=1" would be applied
  * to arrive at "every January, every other year". Then, "BYDAY=SU"
  * would be applied to arrive at "every Sunday in January, every
- * other year".  Then, "BYHOUR=8,9" would be applied to arrive at
+ * other year". Then, "BYHOUR=8,9" would be applied to arrive at
  * "every Sunday in January at 8 AM and 9 AM, every other year".
  * Then, "BYMINUTE=30" would be applied to arrive at "every Sunday in
  * January at 8:30 AM and 9:30 AM, every other year". Then, lacking
@@ -487,7 +487,7 @@ public class RecurrenceExpression extends AbstractExpression<RecurrenceExpressio
      */
     public RecurrenceExpression(final String recurrenceRule, final Date startTime, final TimeZone zone)
             throws ParseException {
-        super(recurrenceRule, ";", startTime, zone, 0);
+        super(recurrenceRule, ";", startTime, zone, 0, 366);
     }
 
     @Override
@@ -502,7 +502,15 @@ public class RecurrenceExpression extends AbstractExpression<RecurrenceExpressio
             throw new IllegalArgumentException("Start date cannot be after until");
         }
 
-        super.setStartDate(startDate);
+        // We set the real start date to the next second; milliseconds are not supported by Recurrence expressions
+        // anyways
+        Calendar calendar = Calendar.getInstance(getTimeZone());
+        calendar.setTime(startDate);
+        if (calendar.get(Calendar.MILLISECOND) != 0) {
+            calendar.add(Calendar.SECOND, 1);
+            calendar.set(Calendar.MILLISECOND, 0);
+        }
+        super.setStartDate(calendar.getTime());
     }
 
     @Override
@@ -551,23 +559,8 @@ public class RecurrenceExpression extends AbstractExpression<RecurrenceExpressio
         if (!(isUntil || isCount)) {
             return null;
         } else {
-
-            if (getCandidates().isEmpty()) {
-                try {
-                    parseExpression(getExpression());
-                } catch (ParseException e) {
-                    logger.error("An exception occurred while parsing the expression : '{}'", e.getMessage());
-                }
-            }
-
-            if (!getCandidates().isEmpty()) {
-
-                Collections.sort(getCandidates());
-
-                return getCandidates().get(getCandidates().size() - 1);
-            }
+            return super.getFinalFireTime();
         }
-        return null;
     }
 
     @Override
@@ -661,7 +654,7 @@ public class RecurrenceExpression extends AbstractExpression<RecurrenceExpressio
     }
 
     @Override
-    protected void prune() {
+    protected void pruneFarthest() {
         Collections.sort(getCandidates());
 
         ArrayList<Date> beforeDates = new ArrayList<Date>();
@@ -1845,6 +1838,11 @@ public class RecurrenceExpression extends AbstractExpression<RecurrenceExpressio
         public int order() {
             return 13;
         }
+    }
+
+    @Override
+    public boolean hasFloatingStartDate() {
+        return false;
     }
 
 }

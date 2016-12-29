@@ -60,7 +60,7 @@
                "id":"itemStateUpdateTriggerID",
                "type":"GenericEventTrigger",
                "configuration":{
-                  "eventSource":"$itemName",
+                  "eventSource":"${itemName}",
                   "eventTopic":"smarthome/items/*",
                   "eventTypes":"ItemStateEvent"
                }
@@ -95,7 +95,7 @@
                "id":"itemStateChangeTriggerID",
                "type":"GenericEventTrigger",
                "configuration":{
-                  "eventSource":"$itemName",
+                  "eventSource":"${itemName}",
                   "eventTopic":"smarthome/items/${itemName}/state",
                   "eventTypes":"ItemStateChangedEvent"
                }
@@ -108,6 +108,41 @@
                "description":"the event of the item state change",
                "label":"Event",
                "reference":"itemStateChangeTriggerID.event"
+            }
+         ]
+      },
+      {
+         "uid":"ChannelEventTrigger",
+         "label":"Channel Trigger",
+         "description":"This triggers a rule if a channel emits a trigger",
+         "configDescriptions":[
+            {
+               "name":"channelUID",
+               "type":"TEXT",
+               "context":"channel",
+               "label":"Channel",
+               "description":"the id of the channel which should be observed for triggers",
+               "required":true
+            }
+         ],
+         "children":[
+            {
+               "id":"channelEventTriggerId",
+               "type":"GenericEventTrigger",
+               "configuration":{
+                  "eventSource":"${channelUID}",
+                  "eventTopic":"smarthome/channels/*/triggered",
+                  "eventTypes":"ChannelTriggeredEvent"
+               }
+            }
+         ],
+         "outputs":[
+            {
+               "name":"event",
+               "type":"org.eclipse.smarthome.core.events.Event",
+               "description":"the event of the channel trigger",
+               "label":"Event",
+               "reference":"channelEventTriggerId.event"
             }
          ]
       }

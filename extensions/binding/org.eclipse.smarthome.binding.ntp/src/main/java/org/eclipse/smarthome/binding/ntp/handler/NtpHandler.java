@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -56,7 +56,7 @@ public class NtpHandler extends BaseThingHandler {
     private Logger logger = LoggerFactory.getLogger(NtpHandler.class);
 
     /** timeout for requests to the NTP server */
-    private static final int NTP_TIMEOUT = 5000;
+    private static final int NTP_TIMEOUT = 10000;
 
     public static final String DATE_PATTERN_WITH_TZ = "yyyy-MM-dd HH:mm:ss z";
 
@@ -128,12 +128,12 @@ public class NtpHandler extends BaseThingHandler {
                 logger.debug("{} using default locale: {}", getThing().getUID().toString(), locale);
             }
             dateTimeChannelUID = new ChannelUID(getThing().getUID(), CHANNEL_DATE_TIME);
-            stringChannelUID = new ChannelUID(getThing().getUID(), CHANNEL_STING);
+            stringChannelUID = new ChannelUID(getThing().getUID(), CHANNEL_STRING);
             try {
                 Channel stringChannel = getThing().getChannel(stringChannelUID.getId());
                 Configuration cfg = stringChannel.getConfiguration();
                 String dateTimeFormatString = (String) cfg.get(PROPERTY_DATE_TIME_FORMAT);
-                if (dateTimeFormatString == null || dateTimeFormatString.isEmpty()) {
+                if (!(dateTimeFormatString == null || dateTimeFormatString.isEmpty())) {
                     dateTimeFormat = new SimpleDateFormat(dateTimeFormatString);
                     logger.debug("Could not format {} with DateFormat '{}', using default format.",
                             getThing().getUID().toString(), dateTimeFormatString);
@@ -181,23 +181,26 @@ public class NtpHandler extends BaseThingHandler {
     }
 
     private synchronized void refreshTimeDate() {
+        if (timeZone != null && locale != null) {
+            long networkTimeInMillis;
+            if (refreshNtpCount <= 0) {
+                networkTimeInMillis = getTime(hostname);
+                timeOffset = networkTimeInMillis - System.currentTimeMillis();
+                logger.debug("{} delta system time: {}", getThing().getUID().toString(), timeOffset);
+                refreshNtpCount = refreshNtp.intValue();
+            } else {
+                networkTimeInMillis = System.currentTimeMillis() + timeOffset;
+                refreshNtpCount--;
+            }
 
-        long networkTimeInMillis;
-        if (refreshNtpCount <= 0) {
-            networkTimeInMillis = getTime(hostname);
-            timeOffset = networkTimeInMillis - System.currentTimeMillis();
-            logger.debug("{} delta system time: {}", getThing().getUID().toString(), timeOffset);
-            refreshNtpCount = refreshNtp.intValue();
+            Calendar calendar = Calendar.getInstance(timeZone, locale);
+            calendar.setTimeInMillis(networkTimeInMillis);
+
+            updateState(dateTimeChannelUID, new DateTimeType(calendar));
+            updateState(stringChannelUID, new StringType(dateTimeFormat.format(calendar.getTime())));
         } else {
-            networkTimeInMillis = System.currentTimeMillis() + timeOffset;
-            refreshNtpCount--;
+            logger.debug("Not refreshing, since we do not seem to be initialized yet");
         }
-
-        Calendar calendar = Calendar.getInstance(timeZone, locale);
-        calendar.setTimeInMillis(networkTimeInMillis);
-
-        updateState(dateTimeChannelUID, new DateTimeType(calendar));
-        updateState(stringChannelUID, new StringType(dateTimeFormat.format(calendar.getTime())));
     }
 
     /**

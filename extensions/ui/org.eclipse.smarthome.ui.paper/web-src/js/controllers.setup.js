@@ -102,14 +102,16 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         $scope.activeScans.push(bindingId);
         discoveryService.scan({
             'bindingId' : bindingId
-        }, function() {
-
+        }, function(response) {
+            var timeout = parseInt(response.timeout);
+            timeout = (!isNaN(timeout) ? timeout : 3) * 1000;
+            setTimeout(function() {
+                $scope.$apply(function() {
+                    $scope.activeScans.splice($scope.activeScans.indexOf(bindingId), 1)
+                });
+            }, timeout);
         });
-        setTimeout(function() {
-            $scope.$apply(function() {
-                $scope.activeScans.splice($scope.activeScans.indexOf(bindingId), 1)
-            });
-        }, 3000);
+
     };
 
     bindingRepository.getAll();
@@ -146,30 +148,11 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         $mdDialog.cancel();
     }
     $scope.approve = function(label) {
-        var selectedGroupNames = [];
-        for ( var groupName in $scope.groupNames) {
-            if ($scope.groupNames[groupName]) {
-                selectedGroupNames.push(groupName);
-            }
-        }
         $mdDialog.hide({
-            label : label,
-            groupNames : selectedGroupNames
+            label : label
         });
     }
-}).controller('ManualSetupChooseController', function($scope, bindingRepository, thingTypeRepository, thingService) {
-    $scope.setSubtitle([ 'Manual Setup' ]);
-    $scope.setHeaderText('Choose a thing, which should be aded manually to your Smart Home.')
-
-    $scope.currentBindingId = null;
-    $scope.setCurrentBindingId = function(bindingId) {
-        $scope.currentBindingId = bindingId;
-    };
-
-    bindingRepository.getAll(function(data) {
-    });
-
-}).controller('ManualSetupConfigureController', function($scope, $routeParams, $mdDialog, $location, toastService, bindingRepository, thingTypeRepository, thingService, thingRepository, configService, linkService) {
+}).controller('ManualSetupConfigureController', function($scope, $routeParams, $mdDialog, $location, toastService, bindingRepository, thingTypeService, thingService, thingRepository, configService, linkService) {
 
     var thingTypeUID = $routeParams.thingTypeUID;
 
@@ -206,14 +189,6 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         });
     };
 
-    function linkChannel(channelUID) {
-        var itemName = channelUID.replace(/:/g, "_");
-        linkService.link({
-            itemName : itemName,
-            channelUID : channelUID
-        });
-    }
-
     $scope.needsBridge = false;
     $scope.bridges = [];
     $scope.getBridges = function() {
@@ -231,8 +206,8 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         });
     };
 
-    thingTypeRepository.getOne(function(thingType) {
-        return thingType.UID === thingTypeUID;
+    thingTypeService.getByUid({
+        thingTypeUID : thingTypeUID
     }, function(thingType) {
         $scope.setTitle('Configure ' + thingType.label);
         $scope.setHeaderText(thingType.description);
@@ -258,6 +233,11 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
     $scope.refresh();
     $scope.filter = function(discoveryResult) {
         return $scope.showIgnored || discoveryResult.flag === 'NEW';
+    }
+    $scope.areEntriesIgnored = function(discoveryResults) {
+        return $.grep(discoveryResults, function(discoveryResult) {
+            return discoveryResult.flag === 'IGNORED';
+        }).length > 0;
     }
 }).controller('SetupWizardBindingsController', function($scope, bindingRepository, discoveryService) {
     $scope.setSubtitle([ 'Choose Binding' ]);
@@ -300,13 +280,16 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         $scope.scanning = true;
         discoveryService.scan({
             'bindingId' : bindingId
-        }, function() {
+        }, function(response) {
+            var timeout = parseInt(response.timeout);
+            timeout = (!isNaN(timeout) ? timeout : 10) * 1000;
+            setTimeout(function() {
+                $scope.$apply(function() {
+                    $scope.scanning = false;
+                });
+            }, timeout);
         });
-        setTimeout(function() {
-            $scope.$apply(function() {
-                $scope.scanning = false;
-            });
-        }, 10000);
+
     };
 
     $scope.refresh = function() {

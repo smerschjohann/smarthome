@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -21,6 +21,7 @@ import org.eclipse.smarthome.core.thing.ThingTypeUID;
  * </ul>
  *
  * @author Michael Grammling - Initial Contribution.
+ * @author Ivaylo Ivanov - Added getMaxScanTimeout
  *
  * @see DiscoveryService
  * @see DiscoveryListener
@@ -164,5 +165,23 @@ public interface DiscoveryServiceRegistry {
      * @return list of bindings, that support discovery
      */
     List<String> getSupportedBindings();
+
+    /**
+     * Returns the maximum discovery timeout from all discovery services registered for the specified thingTypeUID
+     * 
+     * @param thingTypeUID
+     *            thing type UID
+     * @return the maximum amount of seconds which the discovery can take
+     */
+    int getMaxScanTimeout(ThingTypeUID thingTypeUID);
+
+    /**
+     * Returns the maximum discovery timeout from all discovery services registered for the specified binding id
+     * 
+     * @param bindingId
+     *            id of the binding 
+     * @return the maximum amount of seconds which the discovery can take
+     */
+    int getMaxScanTimeout(String bindingId);
 
 }

@@ -1,6 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
- *
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -33,7 +32,7 @@ import org.xml.sax.helpers.XMLReaderFactory;
 /**
  * The {@link SonosXMLParser} is a class of helper functions
  * to parse XML data returned by the Zone Players
- * 
+ *
  * @author Karel Goderis - Initial contribution
  */
 public class SonosXMLParser {
@@ -88,7 +87,7 @@ public class SonosXMLParser {
             reader.setContentHandler(handler);
             reader.parse(new InputSource(new StringReader(xml)));
         } catch (IOException e) {
-            logger.error("Could not parse Alarms from string '{}", xml);
+            logger.error("Could not parse Alarms from string '{}'", xml);
         } catch (SAXException s) {
             logger.error("Could not parse Alarms from string '{}'", xml);
         }
@@ -119,7 +118,7 @@ public class SonosXMLParser {
     /**
      * Returns the meta data which is needed to play Pandora
      * (and others?) favorites
-     * 
+     *
      * @param xml
      * @return The value of the desc xml tag
      * @throws SAXException
@@ -131,7 +130,9 @@ public class SonosXMLParser {
         try {
             reader.parse(new InputSource(new StringReader(xml)));
         } catch (IOException e) {
-            logger.error("Could not parse Entries from String {}", xml);
+            logger.error("Could not parse Resource MetaData from String '{}'", xml);
+        } catch (SAXException s) {
+            logger.error("Could not parse Resource MetaData from string '{}'", xml);
         }
         return handler.getMetaData();
     }
@@ -185,7 +186,7 @@ public class SonosXMLParser {
             reader.parse(new InputSource(new StringReader(xml)));
         } catch (IOException e) {
             // This should never happen - we're not performing I/O!
-            logger.debug("Could not parse Rendering Control from string '{}'", xml);
+            logger.error("Could not parse Rendering Control from string '{}'", xml);
         } catch (SAXException s) {
             logger.error("Could not parse Rendering Control from string '{}'", xml);
         }
@@ -316,7 +317,8 @@ public class SonosXMLParser {
                 case RESMD:
                     desc.append(ch, start, length);
                     break;
-                // no default
+                case DESC:
+                    break;
             }
         }
 
@@ -334,10 +336,12 @@ public class SonosXMLParser {
                 SonosResourceMetaData md = null;
 
                 // The resource description is needed for playing favorites on pandora
-                try {
-                    md = getResourceMetaData(desc.toString());
-                } catch (SAXException ignore) {
-                    logger.debug("Failed to parse embeded", ignore);
+                if (!desc.toString().isEmpty()) {
+                    try {
+                        md = getResourceMetaData(desc.toString());
+                    } catch (SAXException ignore) {
+                        logger.debug("Failed to parse embeded", ignore);
+                    }
                 }
 
                 artists.add(new SonosEntry(id, title.toString(), parentId, album.toString(), albumArtUri.toString(),
@@ -583,7 +587,7 @@ public class SonosXMLParser {
         private final List<String> textFields = new ArrayList<String>();
         private String textField;
         private String type;
-        private String logo;
+        // private String logo;
 
         @Override
         public void startElement(String uri, String localName, String qName, Attributes attributes)
@@ -761,6 +765,8 @@ public class SonosXMLParser {
                     case albumArtist:
                         albumArtist.append(ch, start, length);
                         break;
+                    case desc:
+                        break;
                 }
             }
         }
@@ -828,7 +834,7 @@ public class SonosXMLParser {
             URL url = new URL(descriptorXML);
             reader.parse(new InputSource(url.openStream()));
         } catch (IOException | SAXException e) {
-            logger.error("Could not parse Sonos room name from string '{}", descriptorXML);
+            logger.error("Could not parse Sonos room name from string '{}'", descriptorXML);
         }
         return roomNameHandler.getRoomName();
     }
@@ -866,7 +872,7 @@ public class SonosXMLParser {
             URL url = new URL(descriptorURL.toString());
             reader.parse(new InputSource(url.openStream()));
         } catch (IOException | SAXException e) {
-            logger.error("Could not parse Sonos model name from string '{}", descriptorURL.toString());
+            logger.error("Could not parse Sonos model name from string '{}'", descriptorURL.toString());
         }
         return modelNameHandler.getModelName();
     }
@@ -898,7 +904,7 @@ public class SonosXMLParser {
 
     /**
      * The model name provided by upnp is formated like in the example form "Sonos PLAY:1" or "Sonos PLAYBAR"
-     * 
+     *
      * @param sonosModelName Sonos model name provided via upnp device
      * @return the extracted players model name without column (:) character used for ThingType creation
      */

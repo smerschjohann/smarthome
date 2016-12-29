@@ -413,3 +413,45 @@ md-tabs.section-tabs {
 md-toast {
 	position: fixed;
 }
+
+#wrapper .title h1 {
+	text-overflow: ellipsis;
+	overflow: hidden;
+}
+
+@media all and (max-width: 960px) {
+	.md-dialog-content h1 {
+		font-size: 2em;
+	}
+	.md-dialog-content h2 {
+		font-size: 1.75em;
+	}
+	.md-dialog-content h3 {
+		font-size: 1.40em;
+		font-weight: 400;
+	}
+	.md-dialog-content h4 {
+		font-size: 1.30em;
+		font-weight: 400;
+	}
+	.md-dialog-content h5 {
+		font-size: 1.20em;
+		font-weight: 400;
+	}
+	.md-dialog-content h6 {
+		font-size: 1.10em;
+		font-weight: 400;
+	}
+}
+
+.jsDisabled {
+	position: absolute;
+	top: 0px;
+	background-color: #AE0000;
+	color: white;
+	z-index: 100;
+	font-weight: bold;
+	font-size: 120%;
+	width: 100%;
+	text-align: center;
+}

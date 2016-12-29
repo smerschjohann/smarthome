@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,6 +14,8 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.eclipse.smarthome.core.common.registry.RegistryChangeListener;
@@ -29,17 +31,22 @@ import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingRegistry;
 import org.eclipse.smarthome.core.thing.link.ItemChannelLink;
 import org.eclipse.smarthome.core.thing.link.ItemChannelLinkRegistry;
+import org.eclipse.smarthome.core.thing.type.ChannelKind;
 import org.eclipse.smarthome.core.thing.type.ChannelType;
 import org.eclipse.smarthome.core.thing.type.TypeResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class dynamically provides items for all links that point to non-existing items.
  *
  * @author Kai Kreuzer
  * @author Markus Rathgeb - Add locale provider support
- *
+ * @author Thomas Höfer - Added modified operation
  */
 public class ChannelItemProvider implements ItemProvider {
+
+    private final Logger logger = LoggerFactory.getLogger(ChannelItemProvider.class);
 
     private Set<ProviderChangeListener<Item>> listeners = new HashSet<>();
 
@@ -51,10 +58,12 @@ public class ChannelItemProvider implements ItemProvider {
     private Map<String, Item> items = null;
 
     private boolean enabled = true;
+    private boolean initialized = false;
+    private long lastUpdate = System.nanoTime();
 
     @Override
     public Collection<Item> getAll() {
-        if (!enabled) {
+        if (!enabled || !initialized) {
             return Collections.emptySet();
         } else {
             synchronized (this) {
@@ -123,40 +132,73 @@ public class ChannelItemProvider implements ItemProvider {
     }
 
     protected void activate(Map<String, Object> properties) {
+        modified(properties);
+    }
+
+    protected synchronized void modified(Map<String, Object> properties) {
         if (properties != null) {
             String enabled = (String) properties.get("enabled");
             if ("false".equalsIgnoreCase(enabled)) {
                 this.enabled = false;
+            } else {
+                this.enabled = true;
             }
         }
+
         if (enabled) {
-            for (ProviderChangeListener<Item> listener : listeners) {
-                for (Item item : getAll()) {
-                    listener.added(this, item);
+            Executors.newSingleThreadExecutor().submit(new Runnable() {
+                @Override
+                public void run() {
+                    // we wait until no further new links or items are announced in order to avoid creation of
+                    // items which then must be removed again immediately.
+                    while (lastUpdate > System.nanoTime() - TimeUnit.SECONDS.toNanos(2)) {
+                        try {
+                            Thread.sleep(100L);
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                    logger.debug("Enabling channel item provider.");
+                    initialized = true;
+                    // simply call getAll() will create the items and notify all registered listeners automatically
+                    getAll();
+                    addRegistryChangeListeners();
                 }
-            }
-            this.linkRegistry.addRegistryChangeListener(linkRegistryListener);
-            this.itemRegistry.addRegistryChangeListener(itemRegistryListener);
-            this.thingRegistry.addRegistryChangeListener(thingRegistryListener);
+            });
         } else {
+            logger.debug("Disabling channel item provider.");
             for (ProviderChangeListener<Item> listener : listeners) {
                 for (Item item : getAll()) {
                     listener.removed(this, item);
                 }
             }
+            removeRegistryChangeListeners();
         }
     }
 
     protected void deactivate() {
-        this.itemRegistry.removeRegistryChangeListener(itemRegistryListener);
-        this.linkRegistry.removeRegistryChangeListener(linkRegistryListener);
-        this.thingRegistry.removeRegistryChangeListener(thingRegistryListener);
+        removeRegistryChangeListeners();
         synchronized (this) {
+            initialized = false;
             items = null;
         }
     }
 
+    private void addRegistryChangeListeners() {
+        this.linkRegistry.addRegistryChangeListener(linkRegistryListener);
+        this.itemRegistry.addRegistryChangeListener(itemRegistryListener);
+        this.thingRegistry.addRegistryChangeListener(thingRegistryListener);
+    }
+
+    private void removeRegistryChangeListeners() {
+        this.itemRegistry.removeRegistryChangeListener(itemRegistryListener);
+        this.linkRegistry.removeRegistryChangeListener(linkRegistryListener);
+        this.thingRegistry.removeRegistryChangeListener(thingRegistryListener);
+    }
+
     private void createItemForLink(ItemChannelLink link) {
+        if (!enabled) {
+            return;
+        }
         if (itemRegistry.get(link.getItemName()) != null) {
             // there is already an item, we do not need to create one
             return;
@@ -164,10 +206,13 @@ public class ChannelItemProvider implements ItemProvider {
         Channel channel = thingRegistry.getChannel(link.getUID());
         if (channel != null) {
             Item item = null;
-            for (ItemFactory itemFactory : itemFactories) {
-                item = itemFactory.createItem(channel.getAcceptedItemType(), link.getItemName());
-                if (item != null) {
-                    break;
+            // Only create an item for state channels
+            if (channel.getKind() == ChannelKind.STATE) {
+                for (ItemFactory itemFactory : itemFactories) {
+                    item = itemFactory.createItem(channel.getAcceptedItemType(), link.getItemName());
+                    if (item != null) {
+                        break;
+                    }
                 }
             }
             if (item != null) {
@@ -258,6 +303,7 @@ public class ChannelItemProvider implements ItemProvider {
         @Override
         public void added(ItemChannelLink element) {
             createItemForLink(element);
+            lastUpdate = System.nanoTime();
         }
 
         @Override
@@ -276,15 +322,20 @@ public class ChannelItemProvider implements ItemProvider {
 
         @Override
         public void added(Item element) {
-            if (!items.values().contains(element)) {
-                // it is from some other provider, so remove ours, if we have one
-                Item oldElement = items.remove(element.getName());
-                if (oldElement != null) {
-                    for (ProviderChangeListener<Item> listener : listeners) {
-                        listener.removed(ChannelItemProvider.this, oldElement);
-                    }
+            // check, if it is our own item
+            for (Item item : items.values()) {
+                if (item == element) {
+                    return;
                 }
             }
+            // it is from some other provider, so remove ours, if we have one
+            Item oldElement = items.remove(element.getName());
+            if (oldElement != null) {
+                for (ProviderChangeListener<Item> listener : listeners) {
+                    listener.removed(ChannelItemProvider.this, oldElement);
+                }
+            }
+            lastUpdate = System.nanoTime();
         }
 
         @Override

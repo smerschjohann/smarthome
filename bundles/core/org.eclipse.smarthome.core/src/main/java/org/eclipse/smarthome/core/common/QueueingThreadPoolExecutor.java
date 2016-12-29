@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2016 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2016 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -110,7 +110,7 @@ public class QueueingThreadPoolExecutor extends ThreadPoolExecutor {
             synchronized (this) {
                 // check again to make sure it has not been created by another thread
                 if (queueThread == null || !queueThread.isAlive()) {
-                    logger.debug("Thread pool '{}' exhausted, queueing tasks now.", threadPoolName);
+                    logger.trace("Thread pool '{}' exhausted, queueing tasks now.", threadPoolName);
                     queueThread = createNewQueueThread();
                     queueThread.start();
                 }
@@ -171,7 +171,7 @@ public class QueueingThreadPoolExecutor extends ThreadPoolExecutor {
                             // keep waiting for max 2 seconds if further tasks are pushed to the queue
                             Runnable runnable = taskQueue.poll(2, TimeUnit.SECONDS);
                             if (runnable != null) {
-                                logger.debug("Executing queued task of thread pool '{}'.", threadPoolName);
+                                logger.trace("Executing queued task of thread pool '{}'.", threadPoolName);
                                 QueueingThreadPoolExecutor.super.execute(runnable);
                             } else {
                                 break;
@@ -188,7 +188,7 @@ public class QueueingThreadPoolExecutor extends ThreadPoolExecutor {
                         }
                     }
                 }
-                logger.debug("Queue for thread pool '{}' fully processed - terminating queue thread.", threadPoolName);
+                logger.trace("Queue for thread pool '{}' fully processed - terminating queue thread.", threadPoolName);
             }
         });
         thread.setName(threadPoolName + "-queue");
