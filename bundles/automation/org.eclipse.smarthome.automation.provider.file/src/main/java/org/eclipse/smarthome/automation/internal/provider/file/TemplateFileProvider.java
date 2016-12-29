@@ -12,18 +12,19 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Locale;
 
+import org.eclipse.smarthome.automation.provider.file.AbstractParseableFileProvider;
 import org.eclipse.smarthome.automation.template.RuleTemplate;
 import org.eclipse.smarthome.automation.template.RuleTemplateProvider;
 import org.eclipse.smarthome.automation.template.TemplateProvider;
 
 /**
- * This class is implementation of {@link TemplateProvider}. It extends functionality of {@link AbstractFileProvider}
+ * This class is implementation of {@link TemplateProvider}. It extends functionality of {@link AbstractParseableFileProvider}
  * for importing the {@link RuleTemplate}s from local files.
  *
  * @author Ana Dimova - Initial Contribution
  *
  */
-public abstract class TemplateFileProvider extends AbstractFileProvider<RuleTemplate> implements RuleTemplateProvider {
+public abstract class TemplateFileProvider extends AbstractParseableFileProvider<RuleTemplate> implements RuleTemplateProvider {
 
     public TemplateFileProvider() {
         super("templates");

@@ -7,6 +7,7 @@
  */
 package org.eclipse.smarthome.automation.internal.provider.file;
 
+import org.eclipse.smarthome.automation.provider.file.WatchServiceUtil;
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
 
 /**
