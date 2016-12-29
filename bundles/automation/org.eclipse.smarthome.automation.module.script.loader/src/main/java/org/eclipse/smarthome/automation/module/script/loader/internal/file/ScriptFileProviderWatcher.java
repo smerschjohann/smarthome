@@ -1,4 +1,4 @@
-package org.eclipse.smarthome.automation.module.script.loader;
+package org.eclipse.smarthome.automation.module.script.loader.internal.file;
 
 import org.eclipse.smarthome.automation.provider.file.WatchServiceUtil;
 

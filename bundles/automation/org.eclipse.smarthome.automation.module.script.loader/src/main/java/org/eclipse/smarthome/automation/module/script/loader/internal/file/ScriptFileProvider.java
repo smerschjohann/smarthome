@@ -1,4 +1,4 @@
-package org.eclipse.smarthome.automation.module.script.loader;
+package org.eclipse.smarthome.automation.module.script.loader.internal.file;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
