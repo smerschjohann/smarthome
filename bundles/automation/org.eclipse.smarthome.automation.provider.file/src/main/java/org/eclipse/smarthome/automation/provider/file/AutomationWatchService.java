@@ -5,7 +5,7 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-package org.eclipse.smarthome.automation.internal.provider.file;
+package org.eclipse.smarthome.automation.provider.file;
 
 import static java.nio.file.StandardWatchEventKinds.*;
 
@@ -82,7 +82,13 @@ public class AutomationWatchService extends AbstractWatchService {
                 if (kind.equals(ENTRY_DELETE)) {
                     provider.removeResources(
                             new File(baseWatchedDir.toAbsolutePath() + File.separator + path.toString()));
-                } else {
+                } else if (kind.equals(ENTRY_CREATE)) {
+                    provider.importResources(
+                            new File(baseWatchedDir.toAbsolutePath() + File.separator + path.toString()));
+                } else if (kind.equals(ENTRY_MODIFY)) {
+                    // first remove, then add again
+                    provider.removeResources(
+                            new File(baseWatchedDir.toAbsolutePath() + File.separator + path.toString()));
                     provider.importResources(
                             new File(baseWatchedDir.toAbsolutePath() + File.separator + path.toString()));
                 }

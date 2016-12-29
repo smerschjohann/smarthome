@@ -12,17 +12,18 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Locale;
 
+import org.eclipse.smarthome.automation.provider.file.AbstractParseableFileProvider;
 import org.eclipse.smarthome.automation.type.ModuleType;
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
 
 /**
- * This class is implementation of {@link ModuleTypeProvider}. It extends functionality of {@link AbstractFileProvider}
+ * This class is implementation of {@link ModuleTypeProvider}. It extends functionality of {@link AbstractParseableFileProvider}
  * for importing the {@link ModuleType}s from local files.
  *
  * @author Ana Dimova - Initial Contribution
  *
  */
-public abstract class ModuleTypeFileProvider extends AbstractFileProvider<ModuleType> implements ModuleTypeProvider {
+public abstract class ModuleTypeFileProvider extends AbstractParseableFileProvider<ModuleType> implements ModuleTypeProvider {
 
     public ModuleTypeFileProvider() {
         super("moduletypes");

@@ -18,3 +18,4 @@ Import-Package:
  org.slf4j
 Service-Component: OSGI-INF/*.xml
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
+Export-Package: org.eclipse.smarthome.automation.provider.file

@@ -5,16 +5,19 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-package org.eclipse.smarthome.automation.module.script.loader.internal;
+package org.eclipse.smarthome.automation.module.script;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.HashMap;
 
 import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
-import org.eclipse.smarthome.automation.module.script.ScriptEngineProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,9 +28,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class ScriptManager {
-    private Logger logger = LoggerFactory.getLogger(ScriptManager.class);
-
-    HashMap<String, ScriptEngine> loadedScripts = new HashMap<>();
+    private final Logger logger = LoggerFactory.getLogger(ScriptManager.class.getName());
 
     /**
      * checks if the given script type (file extension) is supported by any scriptengine.
@@ -39,15 +40,25 @@ public class ScriptManager {
         return ScriptEngineProvider.getScriptEngine(scriptType) != null;
     }
 
+    public ScriptEngine loadScript(File file) {
+        try (InputStreamReader streamReader = new InputStreamReader(new FileInputStream(file), UTF_8)) {
+            return loadScript(uniqueId(file), streamReader);
+        } catch (IOException ex) {
+            logger.error("", ex);
+        }
+
+        return null;
+    }
+
     /**
      * loads a script by evaluating its content. After successful loading the scriptLoaded method gets invoked to allow
      * scripts to react on script load/unload.
      *
      * @param identifier: Script file identifier (will be passed to the scriptLoaded method)
-     * @param scriptType: the script engines type
      * @param scriptData: file content
      */
-    public void loadScript(String identifier, String scriptType, InputStreamReader scriptData) {
+    public ScriptEngine loadScript(String identifier, InputStreamReader scriptData) {
+        String scriptType = scriptType(identifier);
         ScriptEngine engine = ScriptEngineProvider.getScriptEngine(scriptType);
 
         if (engine == null) {
@@ -61,14 +72,15 @@ public class ScriptManager {
                 } catch (NoSuchMethodException e) {
                     logger.trace("scriptLoaded() not definied in script: " + identifier);
                 }
-
-                loadedScripts.put(identifier, engine);
             } catch (ScriptException e) {
                 logger.error("Error while executing script", e);
 
                 ScriptEngineProvider.removeEngine(engine);
+                engine = null;
             }
         }
+
+        return engine;
     }
 
     /**
@@ -76,15 +88,13 @@ public class ScriptManager {
      *
      * @param identifier: the unique file identifier
      */
-    public void unloadScript(String identifier) {
-        ScriptEngine engine = loadedScripts.remove(identifier);
-
+    public void unloadScript(ScriptEngine engine) {
         if (engine != null) {
             Invocable inv = (Invocable) engine;
             try {
-                inv.invokeFunction("scriptUnloaded", identifier);
+                inv.invokeFunction("scriptUnloaded");
             } catch (NoSuchMethodException e) {
-                logger.trace("scriptUnloaded() not defined in script: " + identifier);
+                logger.trace("scriptUnloaded() not defined in script");
             } catch (ScriptException e) {
                 logger.error("Error while executing script", e);
             }
@@ -93,4 +103,16 @@ public class ScriptManager {
         }
     }
 
+    private String scriptType(String path) {
+        int fileExtensionStartIndex = path.lastIndexOf(".") + 1;
+        if (fileExtensionStartIndex == -1) {
+            return null;
+        }
+
+        return path.substring(fileExtensionStartIndex);
+    }
+
+    private String uniqueId(File file) {
+        return file.getAbsolutePath();
+    }
 }
