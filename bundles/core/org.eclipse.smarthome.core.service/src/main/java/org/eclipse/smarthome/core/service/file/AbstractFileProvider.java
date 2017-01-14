@@ -5,7 +5,7 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-package org.eclipse.smarthome.automation.provider.file;
+package org.eclipse.smarthome.core.service.file;
 
 import java.io.File;
 import java.net.MalformedURLException;
@@ -17,24 +17,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.eclipse.smarthome.automation.parser.Parser;
-import org.eclipse.smarthome.automation.template.Template;
-import org.eclipse.smarthome.automation.template.TemplateProvider;
-import org.eclipse.smarthome.automation.type.ModuleType;
-import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
 import org.eclipse.smarthome.core.common.registry.Provider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class is base for {@link ModuleTypeProvider} and {@link TemplateProvider}, responsible for importing the
- * automation objects from local file system.
- * <p>
- * It provides functionality for tracking {@link Parser} services and provides common functionality for notifying the
- * {@link ProviderChangeListener}s for adding, updating and removing the {@link ModuleType}s or {@link Template}s.
+ * This class provides the ability to watch for local file changes in a particular directory
  *
  * @author Ana Dimova - Initial Contribution
+ * @author Simon Merschjohann - refactoring to core package
  *
  */
 public abstract class AbstractFileProvider<E> implements Provider<E> {
@@ -66,9 +58,9 @@ public abstract class AbstractFileProvider<E> implements Provider<E> {
     private Map<String, List<URL>> urls = new ConcurrentHashMap<String, List<URL>>();
     private List<ProviderChangeListener<E>> listeners = new ArrayList<ProviderChangeListener<E>>();
 
-    public AbstractFileProvider(String root) {
+    public AbstractFileProvider(String root, String[] configurationRoots) {
         this.rootSubdirectory = root;
-        configurationRoots = new String[] { "automation" };
+        this.configurationRoots = configurationRoots;
     }
 
     public void activate(Map<String, Object> config) {

@@ -1,6 +1,6 @@
 package org.eclipse.smarthome.automation.module.script.loader.internal.file;
 
-import org.eclipse.smarthome.automation.provider.file.WatchServiceUtil;
+import org.eclipse.smarthome.core.service.file.WatchServiceUtil;
 
 public class ScriptFileProviderWatcher extends ScriptFileProvider {
     public ScriptFileProviderWatcher(String root) {

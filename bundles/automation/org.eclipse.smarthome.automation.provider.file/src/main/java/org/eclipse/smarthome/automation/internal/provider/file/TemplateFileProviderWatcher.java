@@ -7,8 +7,8 @@
  */
 package org.eclipse.smarthome.automation.internal.provider.file;
 
-import org.eclipse.smarthome.automation.provider.file.WatchServiceUtil;
 import org.eclipse.smarthome.automation.template.TemplateProvider;
+import org.eclipse.smarthome.core.service.file.WatchServiceUtil;
 
 /**
  * This class is a wrapper of multiple {@link TemplateProvider}s, responsible for initializing the WatchService.

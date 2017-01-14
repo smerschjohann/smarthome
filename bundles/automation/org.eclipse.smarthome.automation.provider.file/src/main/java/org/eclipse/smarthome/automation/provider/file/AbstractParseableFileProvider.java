@@ -25,6 +25,7 @@ import org.eclipse.smarthome.automation.template.TemplateProvider;
 import org.eclipse.smarthome.automation.type.ModuleType;
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
+import org.eclipse.smarthome.core.service.file.AbstractFileProvider;
 
 /**
  * This class is base for {@link ModuleTypeProvider} and {@link TemplateProvider}, responsible for importing the
@@ -53,7 +54,7 @@ public abstract class AbstractParseableFileProvider<E> extends AbstractFileProvi
     private Map<String, List<URL>> urls = new ConcurrentHashMap<String, List<URL>>();
 
     public AbstractParseableFileProvider(String root) {
-        super(root);
+        super(root, new String[] { "automation" });
     }
 
     @Override

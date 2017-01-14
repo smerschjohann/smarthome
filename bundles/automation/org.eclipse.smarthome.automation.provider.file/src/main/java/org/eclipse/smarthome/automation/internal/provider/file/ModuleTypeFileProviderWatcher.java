@@ -7,8 +7,8 @@
  */
 package org.eclipse.smarthome.automation.internal.provider.file;
 
-import org.eclipse.smarthome.automation.provider.file.WatchServiceUtil;
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
+import org.eclipse.smarthome.core.service.file.WatchServiceUtil;
 
 /**
  * This class is a wrapper of {@link ModuleTypeProvider}, responsible for initializing the WatchService.

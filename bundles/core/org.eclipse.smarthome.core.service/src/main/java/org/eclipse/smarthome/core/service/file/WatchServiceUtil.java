@@ -5,7 +5,7 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  */
-package org.eclipse.smarthome.automation.provider.file;
+package org.eclipse.smarthome.core.service.file;
 
 import java.io.File;
 import java.util.HashMap;

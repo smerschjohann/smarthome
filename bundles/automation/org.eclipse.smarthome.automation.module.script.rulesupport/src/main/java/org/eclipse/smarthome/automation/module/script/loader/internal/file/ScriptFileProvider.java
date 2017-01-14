@@ -16,7 +16,7 @@ import javax.script.ScriptEngine;
 
 import org.eclipse.smarthome.automation.module.script.ScriptManager;
 import org.eclipse.smarthome.automation.module.script.loader.internal.ScriptContainer;
-import org.eclipse.smarthome.automation.provider.file.AbstractFileProvider;
+import org.eclipse.smarthome.core.service.file.AbstractFileProvider;
 
 public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptContainer> {
 
@@ -29,7 +29,7 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
     private Thread engineChecker;
 
     public ScriptFileProvider(String root) {
-        super(root);
+        super(root, new String[] { "automation" });
     }
 
     public void setScriptManager(ScriptManager manager) {

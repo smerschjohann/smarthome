@@ -12,6 +12,7 @@ Import-Package:
  org.eclipse.smarthome.config.core,
  org.eclipse.smarthome.core.common.registry,
  org.eclipse.smarthome.core.service,
+ org.eclipse.smarthome.core.service.file,
  org.osgi.framework,
  org.osgi.service.component,
  org.osgi.util.tracker,
