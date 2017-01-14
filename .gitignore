@@ -20,4 +20,4 @@ bundles/storage/org.eclipse.smarthome.storage.mapdb.test/userdata/mapdb/storage.
 bundles/storage/org.eclipse.smarthome.storage.mapdb.test/userdata/mapdb/storage.mapdb.p
 bundles/storage/org.eclipse.smarthome.storage.mapdb.test/userdata/mapdb/storage.mapdb.t
 bundles/storage/org.eclipse.smarthome.storage.json.test/userdata/jsondb/
-features/karaf*/src/main/history
+features/karaf/*/src/main/history

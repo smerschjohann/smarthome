@@ -723,8 +723,35 @@ textarea.scriptArea {
 }
 
 .ruleNameDesc {
-    margin-top: 3%;
+    margin-top: 1%;
     margin-left: 10px;
+}
+
+.ruleNameDesc md-input-container:first-child{
+    margin-bottom: 0px
+}
+
+.ruleNameDesc md-input-container {
+	margin-top: 9px;
+	margin-bottom: 9px;
+}
+
+.ruleNameDesc md-input-container.rules-input input {
+	font-size: 20px;
+	font-weight: 500;
+	color: rgba(0, 0, 0, .87);
+}
+
+.ruleNameDesc md-input-container.rules-input textarea {
+	font-weight: 500;
+}
+
+.ruleNameDesc md-input-container.rules-input.md-input-has-value textarea {
+    font-weight: 300;
+}
+
+.moduleLabel {
+	font-size: 16px;
 }
 
 .customMessage {
@@ -763,7 +790,7 @@ md-input-container .md-errors-spacer {
 	font-style:italic;
 }
 
-.item-edit {
+.item-edit, .inboxContainer {
 	margin-top: 20px;
 }
 
@@ -1108,6 +1135,10 @@ background-color: green;
     color: rgba(0,0,0,0.72);
 }
 
+md-dialog-content .dropdown dt input {
+	width: 85%;
+}
+
 input[type=number].multiSel::-webkit-inner-spin-button, 
 input[type=number].multiSel::-webkit-outer-spin-button { 
     -webkit-appearance: none;
@@ -1191,6 +1222,11 @@ input[type=number].multiSel::-webkit-outer-spin-button {
 .textControl .state {
 	font-size: 30px;
 	font-weight: 300;
+}
+
+.textControl .minDimension {
+	min-height: 40px;
+	min-width: 140px;
 }
 
 .searchBox {

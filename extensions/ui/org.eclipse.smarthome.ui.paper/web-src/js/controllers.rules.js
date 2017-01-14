@@ -78,6 +78,14 @@ angular.module('PaperUI.controllers.rules', []).controller('RulesPageController'
             });
         }
     };
+    $scope.runRule = function(ruleUID, e) {
+        e.stopImmediatePropagation();
+        ruleService.runRule({
+            ruleUID : ruleUID
+        }, function(response) {
+            toastService.showDefaultToast('Rule executed.');
+        });
+    }
 }).controller('NewRuleController', function($scope, itemRepository, ruleService, ruleRepository, toastService, $mdDialog, sharedProperties, moduleTypeService) {
     $scope.setSubtitle([ 'New Rule' ]);
     itemRepository.getAll();
@@ -94,7 +102,8 @@ angular.module('PaperUI.controllers.rules', []).controller('RulesPageController'
             $scope.status = data.status;
             setModuleArrays(data);
         });
-        $scope.setSubtitle([ 'Configure' ]);
+        $scope.setTitle('Edit ' + ruleUID);
+        $scope.setSubtitle([]);
         $scope.editing = true;
     } else if (sharedProperties.getParams().length > 0 && sharedProperties.getParams()[0]) {
         $scope.name = sharedProperties.getParams()[0].label;

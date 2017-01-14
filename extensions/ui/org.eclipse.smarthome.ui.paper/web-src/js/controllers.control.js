@@ -179,7 +179,7 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
     $scope.refresh();
     getThings();
 
-}).controller('ControlController', function($scope, $timeout, $filter, itemService) {
+}).controller('ControlController', function($scope, $timeout, $filter, itemService, util) {
 
     $scope.getItemName = function(itemName) {
         return itemName.replace(/_/g, ' ');
@@ -201,7 +201,11 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
 
         if (item.type === 'DateTime') {
             var date = new Date(item.state);
-            return $filter('date')(date, "dd.MM.yyyy HH:mm:ss");
+            if (item.stateDescription && item.stateDescription.pattern) {
+                return util.timePrint(item.stateDescription.pattern, date);
+            } else {
+                return $filter('date')(date, "dd.MM.yyyy HH:mm:ss");
+            }
         } else if (!item.stateDescription || !item.stateDescription.pattern) {
             return state;
         } else {
@@ -349,9 +353,24 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         $scope.editMode = false;
     };
 }).controller('DefaultItemController', function($scope, itemService) {
-
+    $scope.longEditMode = $scope.shortEditMode = false;
     $scope.optionListChanged = function() {
         $scope.sendCommand($scope.item.state, false);
+    };
+    $scope.editState = function(shortField) {
+        if (shortField) {
+            $scope.shortEditMode = true;
+        } else {
+            $scope.longEditMode = true;
+        }
+    };
+    $scope.updateState = function(shortField) {
+        $scope.sendCommand($scope.item.state, false);
+        if (shortField) {
+            $scope.shortEditMode = false;
+        } else {
+            $scope.longEditMode = false;
+        }
     };
 
 }).controller('ImageItemController', function($scope, itemService) {

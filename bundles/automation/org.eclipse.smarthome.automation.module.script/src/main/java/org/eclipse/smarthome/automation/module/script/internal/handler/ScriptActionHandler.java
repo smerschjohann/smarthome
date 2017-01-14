@@ -26,11 +26,11 @@ import org.slf4j.LoggerFactory;
  * @author Kai Kreuzer - Initial contribution and API
  *
  */
-public class ScriptActionHandler extends AbstractScriptModuleHandler<Action>implements ActionHandler {
+public class ScriptActionHandler extends AbstractScriptModuleHandler<Action> implements ActionHandler {
 
     private final Logger logger = LoggerFactory.getLogger(ScriptActionHandler.class);
 
-    public static final String SCRIPT_ACTION_ID = "ScriptAction";
+    public static final String SCRIPT_ACTION_ID = "script.ScriptAction";
 
     /**
      * constructs a new ScriptActionHandler

@@ -129,7 +129,14 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
     return $resource(restConfig.restPath + '/inbox', {}, {
         getAll : {
             method : 'GET',
-            isArray : true
+            isArray : true,
+            transformResponse : function(data) {
+                var results = angular.fromJson(data);
+                for (var i = 0; i < results.length; i++) {
+                    results[i].bindingType = results[i].thingTypeUID.split(':')[0];
+                }
+                return results
+            },
         },
         approve : {
             method : 'POST',
@@ -455,6 +462,16 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             method : 'GET',
             url : restConfig.restPath + '/templates',
             isArray : true
+        },
+        runRule : {
+            method : 'POST',
+            params : {
+                ruleUID : '@ruleUID'
+            },
+            url : restConfig.restPath + '/rules/:ruleUID/runnow',
+            headers : {
+                'Content-Type' : 'text/plain'
+            }
         }
     });
 }).factory('moduleTypeService', function($resource, restConfig) {
