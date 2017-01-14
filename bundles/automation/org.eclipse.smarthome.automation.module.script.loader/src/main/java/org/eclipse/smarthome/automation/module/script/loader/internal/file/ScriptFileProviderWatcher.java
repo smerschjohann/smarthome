@@ -4,7 +4,7 @@ import org.eclipse.smarthome.automation.provider.file.WatchServiceUtil;
 
 public class ScriptFileProviderWatcher extends ScriptFileProvider {
     public ScriptFileProviderWatcher(String root) {
-        super(root);
+        super("jsr223"); // TODO this should better be configured by a property file
     }
 
     @Override
