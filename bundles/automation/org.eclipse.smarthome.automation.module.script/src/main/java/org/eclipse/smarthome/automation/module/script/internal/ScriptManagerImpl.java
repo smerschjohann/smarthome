@@ -36,21 +36,11 @@ public class ScriptManagerImpl implements ScriptManager {
         logger.info("ScriptManager loading...");
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.eclipse.smarthome.automation.module.script.ScriptManager#isSupported(java.lang.String)
-     */
     @Override
     public boolean isSupported(String scriptType) {
         return ScriptEngineProvider.getScriptEngine(scriptType) != null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.eclipse.smarthome.automation.module.script.ScriptManager#loadScript(java.io.File)
-     */
     @Override
     public ScriptEngine loadScript(File file) {
         try (InputStreamReader streamReader = new InputStreamReader(new FileInputStream(file), UTF_8)) {
@@ -62,12 +52,6 @@ public class ScriptManagerImpl implements ScriptManager {
         return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.eclipse.smarthome.automation.module.script.ScriptManager#loadScript(java.lang.String,
-     * java.io.InputStreamReader)
-     */
     @Override
     public ScriptEngine loadScript(String identifier, InputStreamReader scriptData) {
         String scriptType = scriptType(identifier);
@@ -78,11 +62,15 @@ public class ScriptManagerImpl implements ScriptManager {
         } else {
             try {
                 engine.eval(scriptData);
-                Invocable inv = (Invocable) engine;
-                try {
-                    inv.invokeFunction("scriptLoaded", identifier);
-                } catch (NoSuchMethodException e) {
-                    logger.trace("scriptLoaded() not definied in script: " + identifier);
+                if (engine instanceof Invocable) {
+                    Invocable inv = (Invocable) engine;
+                    try {
+                        inv.invokeFunction("scriptLoaded", identifier);
+                    } catch (NoSuchMethodException e) {
+                        logger.trace("scriptLoaded() not definied in script: " + identifier);
+                    }
+                } else {
+                    logger.trace("engine does not support Invocable interface");
                 }
             } catch (ScriptException e) {
                 logger.error("Error while executing script", e);
@@ -95,21 +83,20 @@ public class ScriptManagerImpl implements ScriptManager {
         return engine;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see org.eclipse.smarthome.automation.module.script.ScriptManager#unloadScript(javax.script.ScriptEngine)
-     */
     @Override
     public void unloadScript(ScriptEngine engine) {
         if (engine != null) {
-            Invocable inv = (Invocable) engine;
-            try {
-                inv.invokeFunction("scriptUnloaded");
-            } catch (NoSuchMethodException e) {
-                logger.trace("scriptUnloaded() not defined in script");
-            } catch (ScriptException e) {
-                logger.error("Error while executing script", e);
+            if (engine instanceof Invocable) {
+                Invocable inv = (Invocable) engine;
+                try {
+                    inv.invokeFunction("scriptUnloaded");
+                } catch (NoSuchMethodException e) {
+                    logger.trace("scriptUnloaded() not defined in script");
+                } catch (ScriptException e) {
+                    logger.error("Error while executing script", e);
+                }
+            } else {
+                logger.trace("engine does not support Invocable interface");
             }
 
             ScriptEngineProvider.removeEngine(engine);
