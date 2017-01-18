@@ -12,9 +12,7 @@ import java.util.Collection;
 import java.util.HashMap;
 
 import org.eclipse.smarthome.automation.Rule;
-import org.eclipse.smarthome.automation.RuleProvider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
-import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 
 /**
@@ -24,31 +22,12 @@ import org.osgi.framework.ServiceRegistration;
  * @author Simon Merschjohann
  *
  */
-public class ScriptedRuleProvider implements RuleProvider {
+public class ScriptedRuleProvider implements IScriptedRuleProvider {
     @SuppressWarnings("rawtypes")
     private ServiceRegistration providerReg;
     private Collection<ProviderChangeListener<Rule>> listeners = new ArrayList<ProviderChangeListener<Rule>>();
 
     HashMap<String, Rule> rules = new HashMap<>();
-
-    /**
-     * This method is used for registration of the ScriptedRuleProvider as a {@link RuleProvider} service.
-     *
-     * @param bc
-     *            is a bundle's execution context within the Framework.
-     */
-    public void register(BundleContext bc) {
-        providerReg = bc.registerService(RuleProvider.class.getName(), this, null);
-    }
-
-    /**
-     * This method is used to unregister the WelcomeHomeRulesProvider service.
-     */
-    public void unregister() {
-        providerReg.unregister();
-        providerReg = null;
-        rules = null;
-    }
 
     @Override
     public void addProviderChangeListener(ProviderChangeListener<Rule> listener) {
@@ -65,6 +44,7 @@ public class ScriptedRuleProvider implements RuleProvider {
         listeners.remove(listener);
     }
 
+    @Override
     public void addRule(Rule rule) {
         rules.put(rule.getUID(), rule);
 
@@ -73,10 +53,12 @@ public class ScriptedRuleProvider implements RuleProvider {
         }
     }
 
+    @Override
     public void removeRule(String ruleUID) {
         removeRule(rules.get(ruleUID));
     }
 
+    @Override
     public void removeRule(Rule rule) {
         for (ProviderChangeListener<Rule> providerChangeListener : listeners) {
             providerChangeListener.removed(this, rule);

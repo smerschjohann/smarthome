@@ -14,7 +14,8 @@ import java.util.UUID;
 import org.eclipse.smarthome.automation.Action;
 import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
-import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.ScriptedModuleHandlerFactory;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.IScriptedModuleHandlerFactory;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.IScriptedRuleProvider;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.LoaderRuleRegistry;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.RuleClassInterface;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedHandlerRegistry;
@@ -43,16 +44,15 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
 
     private LoaderRuleRegistry ruleRegistry;
 
-    private ScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
+    private IScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
 
     private HashSet<ModuleType> modules = new HashSet<>();
     private HashSet<String> moduleHandlers = new HashSet<>();
     private HashSet<String> privateHandlers = new HashSet<>();
-    private HashSet<Rule> rules = new HashSet<>();
 
     public ScriptedHandlerRegistryImpl(RuleRegistry ruleRegistry,
-            ScriptedModuleHandlerFactory scriptedModuleHandlerFactory) {
-        this.ruleRegistry = new LoaderRuleRegistry(ruleRegistry);
+            IScriptedModuleHandlerFactory scriptedModuleHandlerFactory, IScriptedRuleProvider ruleProvider) {
+        this.ruleRegistry = new LoaderRuleRegistry(ruleRegistry, ruleProvider);
         this.scriptedModuleHandlerFactory = scriptedModuleHandlerFactory;
     }
 
@@ -99,8 +99,6 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
     public Rule addRule(RuleClassInterface element) {
         String uid = element.getUid() != null ? element.getUid()
                 : element.getClass().getSimpleName() + "_" + UUID.randomUUID();
-        String name = element.getName() != null ? element.getName() : uid;
-
         Rule rule = new Rule(uid);
 
         try {

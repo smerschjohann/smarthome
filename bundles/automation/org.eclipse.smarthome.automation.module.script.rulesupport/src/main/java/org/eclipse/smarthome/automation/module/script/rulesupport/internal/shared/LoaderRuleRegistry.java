@@ -14,7 +14,6 @@ import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
 import org.eclipse.smarthome.automation.RuleStatus;
 import org.eclipse.smarthome.automation.RuleStatusInfo;
-import org.eclipse.smarthome.automation.module.script.rulesupport.internal.RuleSupportActivator;
 import org.eclipse.smarthome.core.common.registry.RegistryChangeListener;
 
 /**
@@ -30,8 +29,11 @@ public class LoaderRuleRegistry implements RuleRegistry {
 
     private HashSet<String> rules = new HashSet<>();
 
-    public LoaderRuleRegistry(RuleRegistry ruleRegistry) {
+    private IScriptedRuleProvider ruleProvider;
+
+    public LoaderRuleRegistry(RuleRegistry ruleRegistry, IScriptedRuleProvider ruleProvider2) {
         this.ruleRegistry = ruleRegistry;
+        this.ruleProvider = ruleProvider2;
     }
 
     @Override
@@ -56,7 +58,7 @@ public class LoaderRuleRegistry implements RuleRegistry {
 
     @Override
     public Rule add(Rule element) {
-        RuleSupportActivator.getRulesProvider().addRule(element);
+        ruleProvider.addRule(element);
         rules.add(element.getUID());
 
         return element;
@@ -79,7 +81,7 @@ public class LoaderRuleRegistry implements RuleRegistry {
     @Override
     public Rule remove(String key) {
         if (rules.remove(key)) {
-            RuleSupportActivator.getRulesProvider().removeRule(key);
+            ruleProvider.removeRule(key);
         }
 
         return ruleRegistry.remove(key);
@@ -106,7 +108,7 @@ public class LoaderRuleRegistry implements RuleRegistry {
     public void removeAllAddedByScript() {
         for (String rule : rules) {
             try {
-                RuleSupportActivator.getRulesProvider().removeRule(rule);
+                ruleProvider.removeRule(rule);
             } catch (Exception ex) {
                 // ignore
             }

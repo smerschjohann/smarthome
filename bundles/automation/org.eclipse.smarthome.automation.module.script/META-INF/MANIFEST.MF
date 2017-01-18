@@ -10,7 +10,6 @@ Import-Package: javax.script,
  org.eclipse.smarthome.automation.handler,
  org.eclipse.smarthome.automation.module.script,
  org.eclipse.smarthome.automation.parser,
- org.eclipse.smarthome.automation.provider.file,
  org.eclipse.smarthome.config.core,
  org.eclipse.smarthome.core.common.registry,
  org.eclipse.smarthome.core.service,
@@ -18,5 +17,7 @@ Import-Package: javax.script,
  org.osgi.util.tracker,
  org.slf4j
 Automation-ResourceType: json
+Service-Component: OSGI-INF/*.xml
 Bundle-Vendor: Eclipse.org/SmartHome
 Export-Package: org.eclipse.smarthome.automation.module.script
+Bundle-ActivationPolicy: lazy

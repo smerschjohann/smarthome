@@ -21,7 +21,6 @@ import org.eclipse.smarthome.automation.Module;
 import org.eclipse.smarthome.automation.Trigger;
 import org.eclipse.smarthome.automation.handler.BaseModuleHandlerFactory;
 import org.eclipse.smarthome.automation.handler.ModuleHandler;
-import org.eclipse.smarthome.automation.handler.ModuleHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler.ScriptedHandler;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler.SimpleActionHandlerWrapper;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler.SimpleConditionHandlerWrapper;
@@ -34,7 +33,6 @@ import org.eclipse.smarthome.automation.type.ModuleType;
 import org.eclipse.smarthome.automation.type.ModuleTypeProvider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.InvalidSyntaxException;
 import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +43,8 @@ import org.slf4j.LoggerFactory;
  * @author Simon Merschjohann
  *
  */
-public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory implements ModuleTypeProvider {
+public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
+        implements ModuleTypeProvider, IScriptedModuleHandlerFactory {
     private Logger logger = LoggerFactory.getLogger(ScriptedModuleHandlerFactory.class);
 
     private Collection<String> types = null;
@@ -59,14 +58,24 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
     private ServiceRegistration<?> mtpReg;
     private ServiceRegistration<?> bmhfReg;
 
-    public ScriptedModuleHandlerFactory(BundleContext bc) throws InvalidSyntaxException {
+    private HashSet<ProviderChangeListener<ModuleType>> listeners = new HashSet<>();
+
+    private static ScriptedModuleHandlerFactory instance;
+
+    public static IScriptedModuleHandlerFactory get() {
+        return instance;
+    }
+
+    @Override
+    public void activate(BundleContext bundleContext) {
+        super.activate(bundleContext);
+
         types = new HashSet<String>();
 
         types.add("ScriptedAction");
         types.add("ScriptedCondition");
 
-        bmhfReg = bc.registerService(ModuleHandlerFactory.class.getName(), this, null);
-        activate(bc);
+        instance = this;
     }
 
     @Override
@@ -130,6 +139,7 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
         return (Collection<T>) modulesTypes.values();
     }
 
+    @Override
     public void addModuleType(ModuleType moduleType) {
         modulesTypes.put(moduleType.getUID(), moduleType);
 
@@ -142,12 +152,15 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
         }
     }
 
+    @Override
     public void addModuleHandler(String uid, ScriptedHandler scriptedHandler) {
         types.add(uid);
         typesHandlers.put(uid, scriptedHandler);
+
         updateModuleHandlerOffer(uid, null);
     }
 
+    @Override
     public void addModule(ModuleType moduleType, ScriptedHandler scriptedHandler) {
         modulesTypes.put(moduleType.getUID(), moduleType);
         types.add(moduleType.getUID());
@@ -157,6 +170,7 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
         updateModuleHandlerOffer(moduleType.getUID(), null);
     }
 
+    @Override
     public void removeModule(String UID) {
         boolean doneSomething = false;
         doneSomething = modulesTypes.remove(UID) != null || doneSomething;
@@ -168,32 +182,35 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
         }
     }
 
+    @Override
     public String addHandler(String privId, ScriptedHandler scriptedHandler) {
         privateTypes.put(privId, scriptedHandler);
         return privId;
     }
 
+    @Override
     public String addHandler(ScriptedHandler scriptedHandler) {
         String privId = "i" + (nextId++);
         privateTypes.put(privId, scriptedHandler);
         return privId;
     }
 
+    @Override
     public void removeHandler(String privId) {
         privateTypes.remove(privId);
     }
 
-    private void updateModuleHandlerOffer(String addedModuleType, String removedModuleType) {
+    private void updateModuleHandlerOffer(String addedModuleHandler, String removedModuleHandler) {
         Dictionary<String, Object> properties = new Hashtable<String, Object>();
 
-        if (addedModuleType != null) {
+        if (addedModuleHandler != null) {
             Collection<String> elems = new ArrayList<String>(1);
-            elems.add(addedModuleType);
+            elems.add(addedModuleHandler);
             properties.put("added_handlers", elems);
         }
-        if (removedModuleType != null) {
+        if (removedModuleHandler != null) {
             Collection<String> elems = new ArrayList<String>(1);
-            elems.add(removedModuleType);
+            elems.add(removedModuleHandler);
             properties.put("removedhandlers", elems);
         }
 
@@ -216,13 +233,11 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory imple
 
     @Override
     public void addProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
-        // TODO Auto-generated method stub
-
+        this.listeners.add(listener);
     }
 
     @Override
     public void removeProviderChangeListener(ProviderChangeListener<ModuleType> listener) {
-        // TODO Auto-generated method stub
-
+        this.listeners.remove(listener);
     }
 }

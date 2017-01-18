@@ -21,6 +21,8 @@ import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
 import org.eclipse.smarthome.automation.Trigger;
 import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.IScriptedModuleHandlerFactory;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.IScriptedRuleProvider;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRule;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedActionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedConditionHandlerFactory;
@@ -45,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class LoaderScriptExtension implements ScriptExtensionProvider {
     private final static Logger logger = LoggerFactory.getLogger(LoaderScriptExtension.class);
 
-    private static RuleRegistry ruleRegistry;
+    private RuleRegistry ruleRegistry;
 
     private static HashMap<String, Collection<String>> presets = new HashMap<>();
 
@@ -53,6 +55,10 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
     private static HashSet<String> types = new HashSet<String>();
 
     private ConcurrentHashMap<Integer, HashMap<String, Object>> objectCache = new ConcurrentHashMap<>();
+
+    private IScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
+
+    private IScriptedRuleProvider ruleProvider;
 
     static {
         staticTypes.put("ScriptedRule", ScriptedRule.class);
@@ -86,13 +92,17 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
                 Arrays.asList("ActionHandlerFactory", "ConditionHandlerFactory", "TriggerHandlerFactory"));
     }
 
-    public static RuleRegistry getRuleRegistry() {
-        return ruleRegistry;
-    }
-
     public void setRuleRegistry(RuleRegistry ruleRegistry) {
         logger.info("rule registry registered");
-        LoaderScriptExtension.ruleRegistry = ruleRegistry;
+        this.ruleRegistry = ruleRegistry;
+    }
+
+    public void setRuleProvider(IScriptedRuleProvider ruleProvider) {
+        this.ruleProvider = ruleProvider;
+    }
+
+    public void setModuleHandlerFactory(IScriptedModuleHandlerFactory factory) {
+        this.scriptedModuleHandlerFactory = factory;
     }
 
     @Override
@@ -130,8 +140,8 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         }
 
         if (type.equals("HandlerRegistry") || type.equals("RuleRegistry")) {
-            ScriptedHandlerRegistryImpl handlerRegistry = new ScriptedHandlerRegistryImpl(
-                    LoaderScriptExtension.getRuleRegistry(), RuleSupportActivator.getModuleHandlerFactory());
+            ScriptedHandlerRegistryImpl handlerRegistry = new ScriptedHandlerRegistryImpl(ruleRegistry,
+                    scriptedModuleHandlerFactory, ruleProvider);
             objects.put("HandlerRegistry", handlerRegistry);
             RuleRegistry ruleRegistry = handlerRegistry.getRuleRegistry();
             objects.put("RuleRegistry", ruleRegistry);

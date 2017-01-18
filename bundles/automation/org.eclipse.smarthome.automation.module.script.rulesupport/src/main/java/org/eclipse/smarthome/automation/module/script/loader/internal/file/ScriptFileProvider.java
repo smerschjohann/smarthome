@@ -62,7 +62,7 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
                     value.add(url);
                 }
 
-                logger.debug("ScriptEngine for {} not available", scriptType, new Exception());
+                logger.debug("ScriptEngine for {} not available", scriptType);
                 startEngineChecker();
             }
         } else {
