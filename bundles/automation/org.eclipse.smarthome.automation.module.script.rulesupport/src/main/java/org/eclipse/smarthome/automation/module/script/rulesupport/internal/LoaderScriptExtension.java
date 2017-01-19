@@ -32,6 +32,7 @@ import org.eclipse.smarthome.automation.module.script.rulesupport.internal.share
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.simple.SimpleRule;
 import org.eclipse.smarthome.automation.type.ActionType;
 import org.eclipse.smarthome.automation.type.ModuleType;
+import org.eclipse.smarthome.automation.type.TriggerType;
 import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.slf4j.Logger;
@@ -77,6 +78,7 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         staticTypes.put("Rule", Rule.class);
         staticTypes.put("ModuleType", ModuleType.class);
         staticTypes.put("ActionType", ActionType.class);
+        staticTypes.put("TriggerType", TriggerType.class);
         staticTypes.put("ConfigDescriptionParameter", ConfigDescriptionParameter.class);
 
         types.addAll(staticTypes.keySet());
@@ -88,8 +90,8 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         presets.put("RuleSupport",
                 Arrays.asList("Configuration", "Action", "Condition", "Trigger", "Rule", "ModuleType", "ActionType"));
         presets.put("RuleSimple", Arrays.asList("ScriptedRule", "SimpleRule"));
-        presets.put("RuleFactories",
-                Arrays.asList("ActionHandlerFactory", "ConditionHandlerFactory", "TriggerHandlerFactory"));
+        presets.put("RuleFactories", Arrays.asList("ActionHandlerFactory", "ConditionHandlerFactory",
+                "TriggerHandlerFactory", "TriggerType", "ConfigDescriptionParameter"));
     }
 
     public void setRuleRegistry(RuleRegistry ruleRegistry) {

@@ -21,6 +21,7 @@ import org.eclipse.smarthome.automation.Module;
 import org.eclipse.smarthome.automation.Trigger;
 import org.eclipse.smarthome.automation.handler.BaseModuleHandlerFactory;
 import org.eclipse.smarthome.automation.handler.ModuleHandler;
+import org.eclipse.smarthome.automation.handler.ModuleHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler.ScriptedHandler;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler.SimpleActionHandlerWrapper;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler.SimpleConditionHandlerWrapper;
@@ -74,6 +75,8 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
 
         types.add("ScriptedAction");
         types.add("ScriptedCondition");
+
+        bmhfReg = bundleContext.registerService(ModuleHandlerFactory.class.getName(), this, null);
 
         instance = this;
     }
