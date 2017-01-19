@@ -13,5 +13,7 @@
    
    <service>
      <provide interface="org.eclipse.smarthome.automation.module.script.ScriptManager" />
-   </service> 
+   </service>
+   <reference bind="setScriptEngineProvider" cardinality="1..1" interface="org.eclipse.smarthome.automation.module.script.ScriptEngineProvider" name="ScriptEngineProvider" policy="dynamic"/> 
+   
 </scr:component>

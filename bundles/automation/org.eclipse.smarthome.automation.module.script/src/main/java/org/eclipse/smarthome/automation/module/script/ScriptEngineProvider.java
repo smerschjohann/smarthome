@@ -27,6 +27,7 @@ import javax.script.SimpleBindings;
 
 import org.eclipse.smarthome.automation.module.script.internal.ScriptExtensionManager;
 import org.eclipse.smarthome.automation.module.script.internal.handler.AbstractScriptModuleHandler;
+import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,16 +40,27 @@ import org.slf4j.LoggerFactory;
 public class ScriptEngineProvider {
     private static final Logger logger = LoggerFactory.getLogger(ScriptEngineProvider.class);
 
-    private final static ScriptEngineManager engineManager = new ScriptEngineManager();
+    private ScriptEngineManager engineManager;
 
-    private static Set<ScriptScopeProvider> scriptScopeProviders = new CopyOnWriteArraySet<ScriptScopeProvider>();
+    private Set<ScriptScopeProvider> scriptScopeProviders = new CopyOnWriteArraySet<ScriptScopeProvider>();
 
     private static ScriptEngine nashornEngine = null;
 
     // global binding which is used for the Nashorn-ScriptEngine
     private static SimpleBindings nashornGlobalBinding;
 
-    public static List<String> getScriptLanguages() {
+    public void activate(BundleContext bundleContext) {
+        engineManager = new ScriptEngineManager();
+
+        Set<ScriptScopeProvider> onStart = scriptScopeProviders;
+        scriptScopeProviders = new CopyOnWriteArraySet<ScriptScopeProvider>();
+        // initialize providers that are added before activation
+        for (ScriptScopeProvider provider : onStart) {
+            addScopeProvider(provider);
+        }
+    }
+
+    public List<String> getScriptLanguages() {
         ArrayList<String> languages = new ArrayList<>();
 
         for (ScriptEngineFactory f : engineManager.getEngineFactories()) {
@@ -75,7 +87,7 @@ public class ScriptEngineProvider {
      *
      * @return a script engine that supports scripts of the given mime type
      */
-    public static ScriptEngine getScriptEngine(String type) {
+    public ScriptEngine getScriptEngine(String type) {
         ScriptEngine engine = engineManager.getEngineByMimeType(type);
         if (engine == null) {
             engine = engineManager.getEngineByName(type);
@@ -124,7 +136,7 @@ public class ScriptEngineProvider {
         return engine;
     }
 
-    public static void removeEngine(ScriptEngine engine) {
+    public void removeEngine(ScriptEngine engine) {
         try {
             ScriptExtensionManager.dispose(engine.hashCode());
         } catch (Exception ex) {
@@ -183,7 +195,7 @@ public class ScriptEngineProvider {
      * @param engine the script engine to initialize
      * @param provider the provider holding the elements that should be added to the scope
      */
-    private static void initializeNashornScope(ScriptEngine engine, ScriptScopeProvider provider) {
+    private void initializeNashornScope(ScriptEngine engine, ScriptScopeProvider provider) {
         if (!AbstractScriptModuleHandler.class.getClassLoader().getParent().toString().contains("ExtClassLoader")) {
             logger.warn(
                     "Found wrong classloader: To prevent class loading problems use this directive: -Dorg.osgi.framework.bundle.parent=ext");
@@ -247,7 +259,7 @@ public class ScriptEngineProvider {
      * @param engine the script engine to initialize
      * @param provider the provider holding the elements that should be added to the scope
      */
-    private static void initializeGeneralScope(ScriptScopeProvider provider) {
+    private void initializeGeneralScope(ScriptScopeProvider provider) {
         logger.debug("initializing script scope from '{}'.", new Object[] { provider.getClass().getSimpleName() });
 
         Bindings bindings = engineManager.getBindings();
@@ -257,18 +269,21 @@ public class ScriptEngineProvider {
         }
     }
 
-    public static void addScopeProvider(ScriptScopeProvider provider) {
+    public void addScopeProvider(ScriptScopeProvider provider) {
         scriptScopeProviders.add(provider);
-        initializeGeneralScope(provider);
 
-        // we only need to execute nashorn specific scope generation if there already exist a Nashorn-ScriptEngine,
-        // otherwise the scope will be generated on first ScriptEngine request
-        if (nashornEngine != null) {
-            initializeNashornScope(nashornEngine, provider);
+        if (engineManager != null) {
+            initializeGeneralScope(provider);
+
+            // we only need to execute nashorn specific scope generation if there already exist a Nashorn-ScriptEngine,
+            // otherwise the scope will be generated on first ScriptEngine request
+            if (nashornEngine != null) {
+                initializeNashornScope(nashornEngine, provider);
+            }
         }
     }
 
-    public static void removeScopeProvider(ScriptScopeProvider provider) {
+    public void removeScopeProvider(ScriptScopeProvider provider) {
         scriptScopeProviders.remove(provider);
 
         Bindings bindings = engineManager.getBindings();
@@ -282,7 +297,15 @@ public class ScriptEngineProvider {
         }
     }
 
-    public static void clearProviders() {
+    public void addScriptExtensionProvider(ScriptExtensionProvider provider) {
+        ScriptExtensionManager.addScriptExtensionProvider(provider);
+    }
+
+    public void removeScriptExtensionProvider(ScriptExtensionProvider provider) {
+        ScriptExtensionManager.removeScriptExtensionProvider(provider);
+    }
+
+    public void clearProviders() {
         scriptScopeProviders.clear();
     }
 }

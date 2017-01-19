@@ -37,8 +37,8 @@ public class ScriptActionHandler extends AbstractScriptModuleHandler<Action> imp
      *
      * @param module
      */
-    public ScriptActionHandler(Action module) {
-        super(module);
+    public ScriptActionHandler(Action module, ScriptEngineProvider scriptEngineProvider) {
+        super(module, scriptEngineProvider);
     }
 
     @Override
@@ -51,7 +51,7 @@ public class ScriptActionHandler extends AbstractScriptModuleHandler<Action> imp
         Object script = module.getConfiguration().get(SCRIPT);
         if (type instanceof String) {
             if (script instanceof String) {
-                ScriptEngine engine = ScriptEngineProvider.getScriptEngine((String) type);
+                ScriptEngine engine = scriptEngineProvider.getScriptEngine((String) type);
                 if (engine != null) {
                     ScriptContext executionContext = getExecutionContext(engine, context);
                     try {
@@ -63,7 +63,7 @@ public class ScriptActionHandler extends AbstractScriptModuleHandler<Action> imp
                         logger.error("Script execution failed: {}", e.getMessage());
                     }
 
-                    ScriptEngineProvider.removeEngine(engine);
+                    scriptEngineProvider.removeEngine(engine);
                 } else {
                     logger.debug("No engine available for script type '{}' in action '{}'.",
                             new Object[] { type, module.getId() });

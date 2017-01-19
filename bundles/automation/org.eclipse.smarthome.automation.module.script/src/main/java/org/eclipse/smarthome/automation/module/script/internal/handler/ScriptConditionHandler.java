@@ -31,8 +31,8 @@ public class ScriptConditionHandler extends AbstractScriptModuleHandler<Conditio
 
     public static final String SCRIPT_CONDITION = "script.ScriptCondition";
 
-    public ScriptConditionHandler(Condition module) {
-        super(module);
+    public ScriptConditionHandler(Condition module, ScriptEngineProvider scriptEngineProvider) {
+        super(module, scriptEngineProvider);
     }
 
     @Override
@@ -41,7 +41,7 @@ public class ScriptConditionHandler extends AbstractScriptModuleHandler<Conditio
         Object script = module.getConfiguration().get(SCRIPT);
         if (type instanceof String) {
             if (script instanceof String) {
-                ScriptEngine engine = ScriptEngineProvider.getScriptEngine((String) type);
+                ScriptEngine engine = scriptEngineProvider.getScriptEngine((String) type);
                 if (engine != null) {
                     ScriptContext executionContext = getExecutionContext(engine, context);
                     try {
@@ -55,7 +55,7 @@ public class ScriptConditionHandler extends AbstractScriptModuleHandler<Conditio
                         logger.error("Script execution failed: {}", e.getMessage());
                     }
 
-                    ScriptEngineProvider.removeEngine(engine);
+                    scriptEngineProvider.removeEngine(engine);
                 } else {
                     logger.debug("No engine available for script type '{}' in condition '{}'.",
                             new Object[] { type, module.getId() });

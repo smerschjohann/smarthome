@@ -16,6 +16,7 @@ import javax.script.ScriptEngine;
 
 import org.eclipse.smarthome.automation.Module;
 import org.eclipse.smarthome.automation.handler.BaseModuleHandler;
+import org.eclipse.smarthome.automation.module.script.ScriptEngineProvider;
 
 /**
  * This is an abstract class that can be used when implementing any module handler that handles scripts.
@@ -34,8 +35,11 @@ abstract public class AbstractScriptModuleHandler<T extends Module> extends Base
 
     private ScriptContext executionContext;
 
-    public AbstractScriptModuleHandler(T module) {
+    protected ScriptEngineProvider scriptEngineProvider;
+
+    public AbstractScriptModuleHandler(T module, ScriptEngineProvider scriptEngineProvider) {
         super(module);
+        this.scriptEngineProvider = scriptEngineProvider;
     }
 
     /**

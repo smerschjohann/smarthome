@@ -20,6 +20,7 @@ import javax.script.ScriptException;
 
 import org.eclipse.smarthome.automation.module.script.ScriptEngineProvider;
 import org.eclipse.smarthome.automation.module.script.ScriptManager;
+import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +32,24 @@ import org.slf4j.LoggerFactory;
  */
 public class ScriptManagerImpl implements ScriptManager {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    private BundleContext bundleContext;
+    private ScriptEngineProvider scriptEngineProvider;
 
     public ScriptManagerImpl() {
         logger.info("ScriptManager loading...");
     }
 
+    public void activate(BundleContext bundleContext) {
+        this.bundleContext = bundleContext;
+    }
+
+    public void setScriptEngineProvider(ScriptEngineProvider provider) {
+        this.scriptEngineProvider = provider;
+    }
+
     @Override
     public boolean isSupported(String scriptType) {
-        return ScriptEngineProvider.getScriptEngine(scriptType) != null;
+        return scriptEngineProvider.getScriptEngine(scriptType) != null;
     }
 
     @Override
@@ -55,7 +66,7 @@ public class ScriptManagerImpl implements ScriptManager {
     @Override
     public ScriptEngine loadScript(String identifier, InputStreamReader scriptData) {
         String scriptType = scriptType(identifier);
-        ScriptEngine engine = ScriptEngineProvider.getScriptEngine(scriptType);
+        ScriptEngine engine = scriptEngineProvider.getScriptEngine(scriptType);
 
         if (engine == null) {
             logger.error("loadScript(): script language '{}' could not be found for: {}", scriptType, identifier);
@@ -75,7 +86,7 @@ public class ScriptManagerImpl implements ScriptManager {
             } catch (ScriptException e) {
                 logger.error("Error while executing script", e);
 
-                ScriptEngineProvider.removeEngine(engine);
+                scriptEngineProvider.removeEngine(engine);
                 engine = null;
             }
         }
@@ -99,7 +110,7 @@ public class ScriptManagerImpl implements ScriptManager {
                 logger.trace("engine does not support Invocable interface");
             }
 
-            ScriptEngineProvider.removeEngine(engine);
+            scriptEngineProvider.removeEngine(engine);
         }
     }
 
