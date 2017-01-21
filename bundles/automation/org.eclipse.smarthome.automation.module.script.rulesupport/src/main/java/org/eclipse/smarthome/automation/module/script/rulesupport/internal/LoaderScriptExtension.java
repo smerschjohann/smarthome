@@ -35,6 +35,7 @@ import org.eclipse.smarthome.automation.type.ModuleType;
 import org.eclipse.smarthome.automation.type.TriggerType;
 import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
 import org.eclipse.smarthome.config.core.Configuration;
+import org.eclipse.smarthome.core.items.ItemRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +62,8 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
 
     private ScriptedRuleProvider ruleProvider;
 
+    private ItemRegistry itemRegistry;
+
     static {
         staticTypes.put("ScriptedRule", ScriptedRule.class);
         staticTypes.put("SimpleRule", SimpleRule.class);
@@ -81,14 +84,17 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         staticTypes.put("TriggerType", TriggerType.class);
         staticTypes.put("ConfigDescriptionParameter", ConfigDescriptionParameter.class);
 
+        staticTypes.put("ItemRegistry", null);
+        staticTypes.put("ir", null);
+
         types.addAll(staticTypes.keySet());
 
         types.add("HandlerRegistry");
         types.add("RuleRegistry");
         types.add("rules");
 
-        presets.put("RuleSupport",
-                Arrays.asList("Configuration", "Action", "Condition", "Trigger", "Rule", "ModuleType", "ActionType"));
+        presets.put("RuleSupport", Arrays.asList("Configuration", "Action", "Condition", "Trigger", "Rule",
+                "ModuleType", "ActionType", "ItemRegistry", "ir"));
         presets.put("RuleSimple", Arrays.asList("ScriptedRule", "SimpleRule"));
         presets.put("RuleFactories", Arrays.asList("ActionHandlerFactory", "ConditionHandlerFactory",
                 "TriggerHandlerFactory", "TriggerType", "ConfigDescriptionParameter"));
@@ -105,6 +111,16 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
 
     public void setModuleHandlerFactory(ScriptedModuleHandlerFactory factory) {
         this.scriptedModuleHandlerFactory = factory;
+    }
+
+    protected void setItemRegistry(ItemRegistry itemRegistry) {
+        this.itemRegistry = itemRegistry;
+        staticTypes.put("ItemRegistry", this.itemRegistry);
+        staticTypes.put("ir", this.itemRegistry);
+    }
+
+    protected void unsetItemRegistry(ItemRegistry itemRegistry) {
+        this.itemRegistry = null;
     }
 
     @Override
