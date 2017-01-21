@@ -20,7 +20,9 @@ import org.eclipse.smarthome.core.service.file.AbstractFileProvider;
 
 public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptContainer> {
 
-    protected static final long RECHECK_INTERVAL = 30 * 1000;
+    protected static final long RECHECK_INTERVAL = 20 * 1000;
+
+    private long earliestStart = System.currentTimeMillis() + 20 * 1000;
 
     private ScriptManager manager;
 
@@ -40,33 +42,44 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
     protected void importFile(URL url) {
         String scriptType = getScriptType(url);
         if (scriptType != null) {
-            if (manager.isSupported(scriptType)) {
-                try (InputStreamReader reader = new InputStreamReader(new BufferedInputStream(url.openStream()))) {
-                    ScriptEngine engine = manager.loadScript(url.toString(), reader);
-
-                    if (engine != null) {
-                        updateProvidedObjectsHolder(url, Collections.singleton(new ScriptContainer(url, engine)));
-                    } else {
-                        logger.error("error in script, ignore file: {}", url);
-                    }
-                } catch (IOException e) {
-                    logger.error("url=" + url, e);
-                }
-            } else {
-                synchronized (urls) {
-                    List<URL> value = urls.get(scriptType);
-                    if (value == null) {
-                        value = new ArrayList<URL>();
-                        urls.put(scriptType, value);
-                    }
-                    value.add(url);
-                }
-
-                logger.debug("ScriptEngine for {} not available", scriptType);
+            if (System.currentTimeMillis() < earliestStart) {
+                enqueueUrl(url, scriptType);
                 startEngineChecker();
+            } else {
+                if (manager.isSupported(scriptType)) {
+                    try (InputStreamReader reader = new InputStreamReader(new BufferedInputStream(url.openStream()))) {
+                        logger.info("script loading: {}", url.toString());
+                        ScriptEngine engine = manager.loadScript(url.toString(), reader);
+
+                        if (engine != null) {
+                            logger.debug("script successfully loaded: {}", url.toString());
+                            updateProvidedObjectsHolder(url, Collections.singleton(new ScriptContainer(url, engine)));
+                        } else {
+                            logger.error("script ERROR, ignore file: {}", url);
+                        }
+                    } catch (IOException e) {
+                        logger.error("url=" + url, e);
+                    }
+                } else {
+                    enqueueUrl(url, scriptType);
+
+                    logger.info("ScriptEngine for {} not available", scriptType);
+                    startEngineChecker();
+                }
             }
         } else {
             logger.error("cannot determine type of script");
+        }
+    }
+
+    private void enqueueUrl(URL url, String scriptType) {
+        synchronized (urls) {
+            List<URL> value = urls.get(scriptType);
+            if (value == null) {
+                value = new ArrayList<URL>();
+                urls.put(scriptType, value);
+            }
+            value.add(url);
         }
     }
 
