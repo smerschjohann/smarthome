@@ -71,8 +71,6 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
                     startEngineChecker();
                 }
             }
-        } else {
-            logger.error("cannot determine type of script");
         }
     }
 
@@ -146,11 +144,14 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
 
     private String getScriptType(URL url) {
         String fileName = url.getPath();
-        if (fileName.lastIndexOf(".") == -1) {
+        int idx = fileName.lastIndexOf(".");
+        if (idx == -1) {
             return null;
         }
-        String fileExtension = fileName.substring(fileName.lastIndexOf(".") + 1);
-        if (fileExtension.equals("txt")) {
+        String fileExtension = fileName.substring(idx + 1);
+
+        // ignore known file extensions for "temp" files
+        if (fileExtension.equals("txt") || fileExtension.endsWith("~") || fileExtension.endsWith("swp")) {
             return null;
         }
         return fileExtension;
