@@ -21,9 +21,9 @@ import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
 import org.eclipse.smarthome.automation.Trigger;
 import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider;
-import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.IScriptedModuleHandlerFactory;
-import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.IScriptedRuleProvider;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.ScriptedModuleHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRule;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRuleProvider;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedActionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedConditionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedTriggerHandlerFactory;
@@ -57,9 +57,9 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
 
     private ConcurrentHashMap<Integer, HashMap<String, Object>> objectCache = new ConcurrentHashMap<>();
 
-    private IScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
+    private ScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
 
-    private IScriptedRuleProvider ruleProvider;
+    private ScriptedRuleProvider ruleProvider;
 
     static {
         staticTypes.put("ScriptedRule", ScriptedRule.class);
@@ -99,11 +99,11 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         this.ruleRegistry = ruleRegistry;
     }
 
-    public void setRuleProvider(IScriptedRuleProvider ruleProvider) {
+    public void setRuleProvider(ScriptedRuleProvider ruleProvider) {
         this.ruleProvider = ruleProvider;
     }
 
-    public void setModuleHandlerFactory(IScriptedModuleHandlerFactory factory) {
+    public void setModuleHandlerFactory(ScriptedModuleHandlerFactory factory) {
         this.scriptedModuleHandlerFactory = factory;
     }
 

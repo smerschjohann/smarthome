@@ -12,6 +12,6 @@
    <implementation class="org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRuleProvider"/>
    <service>
       <provide interface="org.eclipse.smarthome.automation.RuleProvider"/>
-      <provide interface="org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.IScriptedRuleProvider"/>
+      <provide interface="org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRuleProvider"/>
    </service>
 </scr:component>

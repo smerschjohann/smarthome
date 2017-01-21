@@ -44,8 +44,7 @@ import org.slf4j.LoggerFactory;
  * @author Simon Merschjohann
  *
  */
-public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
-        implements ModuleTypeProvider, IScriptedModuleHandlerFactory {
+public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory implements ModuleTypeProvider {
     private Logger logger = LoggerFactory.getLogger(ScriptedModuleHandlerFactory.class);
 
     private Collection<String> types = null;
@@ -63,7 +62,7 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
 
     private static ScriptedModuleHandlerFactory instance;
 
-    public static IScriptedModuleHandlerFactory get() {
+    public static ScriptedModuleHandlerFactory get() {
         return instance;
     }
 
@@ -142,7 +141,6 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
         return (Collection<T>) modulesTypes.values();
     }
 
-    @Override
     public void addModuleType(ModuleType moduleType) {
         modulesTypes.put(moduleType.getUID(), moduleType);
 
@@ -155,7 +153,6 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
         }
     }
 
-    @Override
     public void addModuleHandler(String uid, ScriptedHandler scriptedHandler) {
         types.add(uid);
         typesHandlers.put(uid, scriptedHandler);
@@ -163,7 +160,6 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
         updateModuleHandlerOffer(uid, null);
     }
 
-    @Override
     public void addModule(ModuleType moduleType, ScriptedHandler scriptedHandler) {
         modulesTypes.put(moduleType.getUID(), moduleType);
         types.add(moduleType.getUID());
@@ -173,7 +169,6 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
         updateModuleHandlerOffer(moduleType.getUID(), null);
     }
 
-    @Override
     public void removeModule(String UID) {
         boolean doneSomething = false;
         doneSomething = modulesTypes.remove(UID) != null || doneSomething;
@@ -185,20 +180,17 @@ public class ScriptedModuleHandlerFactory extends BaseModuleHandlerFactory
         }
     }
 
-    @Override
     public String addHandler(String privId, ScriptedHandler scriptedHandler) {
         privateTypes.put(privId, scriptedHandler);
         return privId;
     }
 
-    @Override
     public String addHandler(ScriptedHandler scriptedHandler) {
         String privId = "i" + (nextId++);
         privateTypes.put(privId, scriptedHandler);
         return privId;
     }
 
-    @Override
     public void removeHandler(String privId) {
         privateTypes.remove(privId);
     }

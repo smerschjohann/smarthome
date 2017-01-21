@@ -14,11 +14,11 @@ import java.util.UUID;
 import org.eclipse.smarthome.automation.Action;
 import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
-import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.IScriptedModuleHandlerFactory;
-import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.IScriptedRuleProvider;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.ScriptedModuleHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.LoaderRuleRegistry;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.RuleClassInterface;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedHandlerRegistry;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRuleProvider;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedActionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedConditionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedTriggerHandlerFactory;
@@ -44,14 +44,14 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
 
     private LoaderRuleRegistry ruleRegistry;
 
-    private IScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
+    private ScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
 
     private HashSet<ModuleType> modules = new HashSet<>();
     private HashSet<String> moduleHandlers = new HashSet<>();
     private HashSet<String> privateHandlers = new HashSet<>();
 
     public ScriptedHandlerRegistryImpl(RuleRegistry ruleRegistry,
-            IScriptedModuleHandlerFactory scriptedModuleHandlerFactory, IScriptedRuleProvider ruleProvider) {
+            ScriptedModuleHandlerFactory scriptedModuleHandlerFactory, ScriptedRuleProvider ruleProvider) {
         this.ruleRegistry = new LoaderRuleRegistry(ruleRegistry, ruleProvider);
         this.scriptedModuleHandlerFactory = scriptedModuleHandlerFactory;
     }

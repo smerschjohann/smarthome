@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.HashMap;
 
 import org.eclipse.smarthome.automation.Rule;
+import org.eclipse.smarthome.automation.RuleProvider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
 import org.osgi.framework.ServiceRegistration;
 
@@ -22,7 +23,7 @@ import org.osgi.framework.ServiceRegistration;
  * @author Simon Merschjohann
  *
  */
-public class ScriptedRuleProvider implements IScriptedRuleProvider {
+public class ScriptedRuleProvider implements RuleProvider {
     @SuppressWarnings("rawtypes")
     private ServiceRegistration providerReg;
     private Collection<ProviderChangeListener<Rule>> listeners = new ArrayList<ProviderChangeListener<Rule>>();
@@ -44,7 +45,6 @@ public class ScriptedRuleProvider implements IScriptedRuleProvider {
         listeners.remove(listener);
     }
 
-    @Override
     public void addRule(Rule rule) {
         rules.put(rule.getUID(), rule);
 
@@ -53,12 +53,10 @@ public class ScriptedRuleProvider implements IScriptedRuleProvider {
         }
     }
 
-    @Override
     public void removeRule(String ruleUID) {
         removeRule(rules.get(ruleUID));
     }
 
-    @Override
     public void removeRule(Rule rule) {
         for (ProviderChangeListener<Rule> providerChangeListener : listeners) {
             providerChangeListener.removed(this, rule);

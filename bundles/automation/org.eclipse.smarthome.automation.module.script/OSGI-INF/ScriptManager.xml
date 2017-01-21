@@ -9,7 +9,7 @@
 
 -->
 <scr:component xmlns:scr="http://www.osgi.org/xmlns/scr/v1.1.0" immediate="true" name="org.eclipse.smarthome.automation.module.script.ScriptManager">
-   <implementation class="org.eclipse.smarthome.automation.module.script.internal.ScriptManagerImpl"/>  
+   <implementation class="org.eclipse.smarthome.automation.module.script.ScriptManager"/>  
    
    <service>
      <provide interface="org.eclipse.smarthome.automation.module.script.ScriptManager" />

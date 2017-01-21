@@ -14,7 +14,7 @@
       <provide interface="org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider"/>
    </service>
    
-   <reference bind="setModuleHandlerFactory" cardinality="1..1" interface="org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.IScriptedModuleHandlerFactory" name="ScriptedModuleHandlerFactory" policy="static" unbind="unsetModuleHandlerFactory" />
+   <reference bind="setModuleHandlerFactory" cardinality="1..1" interface="org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.ScriptedModuleHandlerFactory" name="ScriptedModuleHandlerFactory" policy="static" unbind="unsetModuleHandlerFactory" />
    <reference bind="setRuleRegistry" cardinality="1..1" interface="org.eclipse.smarthome.automation.RuleRegistry" name="RuleRegistry" policy="static" unbind="unsetRuleRegistry"/>
-   <reference bind="setRuleProvider" cardinality="1..1" interface="org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.IScriptedRuleProvider" name="RuleProvider" policy="static" unbind="unsetRuleRegistry"/>
+   <reference bind="setRuleProvider" cardinality="1..1" interface="org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.ScriptedRuleProvider" name="RuleProvider" policy="static" unbind="unsetRuleRegistry"/>
 </scr:component>

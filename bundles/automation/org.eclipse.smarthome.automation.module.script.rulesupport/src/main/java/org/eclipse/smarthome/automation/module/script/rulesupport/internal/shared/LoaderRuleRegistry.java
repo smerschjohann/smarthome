@@ -29,9 +29,9 @@ public class LoaderRuleRegistry implements RuleRegistry {
 
     private HashSet<String> rules = new HashSet<>();
 
-    private IScriptedRuleProvider ruleProvider;
+    private ScriptedRuleProvider ruleProvider;
 
-    public LoaderRuleRegistry(RuleRegistry ruleRegistry, IScriptedRuleProvider ruleProvider2) {
+    public LoaderRuleRegistry(RuleRegistry ruleRegistry, ScriptedRuleProvider ruleProvider2) {
         this.ruleRegistry = ruleRegistry;
         this.ruleProvider = ruleProvider2;
     }
