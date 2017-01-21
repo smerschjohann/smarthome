@@ -31,5 +31,7 @@ public interface RuleClassInterface {
 
     public String getUid();
 
+    public String getDescription();
+
     public Visibility getVisibility();
 }

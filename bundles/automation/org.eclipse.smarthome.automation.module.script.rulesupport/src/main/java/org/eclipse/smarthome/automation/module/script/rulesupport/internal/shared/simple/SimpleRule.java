@@ -32,6 +32,7 @@ public abstract class SimpleRule extends SimpleActionHandler implements RuleClas
     private List<Action> actions = new ArrayList<Action>();
     private List<Trigger> triggers = new ArrayList<Trigger>();
     private List<Condition> conditions = new ArrayList<Condition>();
+    private String description;
 
     public void setName(String name) {
         this.name = name;
@@ -55,6 +56,10 @@ public abstract class SimpleRule extends SimpleActionHandler implements RuleClas
 
     public void setConditions(List<Condition> conditions) {
         this.conditions = conditions;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     @Override
@@ -85,5 +90,10 @@ public abstract class SimpleRule extends SimpleActionHandler implements RuleClas
     @Override
     public Visibility getVisibility() {
         return visibility;
+    }
+
+    @Override
+    public String getDescription() {
+        return description;
     }
 }

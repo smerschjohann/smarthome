@@ -8,7 +8,9 @@
 package org.eclipse.smarthome.automation.module.script.rulesupport.internal.handler;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.smarthome.automation.Action;
 import org.eclipse.smarthome.automation.handler.ActionHandler;
@@ -35,7 +37,21 @@ public class SimpleActionHandlerWrapper extends BaseModuleHandler<Action> implem
 
     @Override
     public Map<String, Object> execute(Map<String, ?> inputs) {
-        Object result = actionHandler.execute(module, inputs);
+        Set<String> keys = new HashSet<String>(inputs.keySet());
+
+        Map<String, Object> extendedInputs = new HashMap<>(inputs);
+        for (String key : keys) {
+            Object value = extendedInputs.get(key);
+            int dotIndex = key.indexOf('.');
+            if (dotIndex != -1) {
+                String moduleName = key.substring(0, dotIndex);
+                extendedInputs.put("module", moduleName);
+                String newKey = key.substring(dotIndex + 1);
+                extendedInputs.put(newKey, value);
+            }
+        }
+
+        Object result = actionHandler.execute(module, extendedInputs);
         HashMap<String, Object> resultMap = new HashMap<String, Object>();
         resultMap.put("result", result);
         return resultMap;

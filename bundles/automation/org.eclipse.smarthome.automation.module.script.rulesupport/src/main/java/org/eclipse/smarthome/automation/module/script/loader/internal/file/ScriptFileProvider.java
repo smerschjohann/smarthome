@@ -4,12 +4,11 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.script.ScriptEngine;
@@ -26,7 +25,7 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
 
     private ScriptManager manager;
 
-    private Map<String, List<URL>> urls = new ConcurrentHashMap<String, List<URL>>();
+    private Map<String, Set<URL>> urls = new ConcurrentHashMap<String, Set<URL>>();
 
     private Thread engineChecker;
 
@@ -39,7 +38,12 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
     }
 
     @Override
-    protected void importFile(URL url) {
+    protected synchronized void importFile(URL url) {
+        if (providerPortfolio.containsKey(url)) {
+            // scripts should only be loaded once
+            return;
+        }
+
         String scriptType = getScriptType(url);
         if (scriptType != null) {
             if (System.currentTimeMillis() < earliestStart) {
@@ -74,12 +78,13 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
 
     private void enqueueUrl(URL url, String scriptType) {
         synchronized (urls) {
-            List<URL> value = urls.get(scriptType);
+            Set<URL> value = urls.get(scriptType);
             if (value == null) {
-                value = new ArrayList<URL>();
+                value = new HashSet<URL>();
                 urls.put(scriptType, value);
             }
             value.add(url);
+            logger.info("in queue: {}", urls);
         }
     }
 

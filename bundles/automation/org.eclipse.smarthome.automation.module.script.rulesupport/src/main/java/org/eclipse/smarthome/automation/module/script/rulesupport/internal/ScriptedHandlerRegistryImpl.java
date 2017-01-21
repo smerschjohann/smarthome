@@ -101,6 +101,14 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
                 : element.getClass().getSimpleName() + "_" + UUID.randomUUID();
         Rule rule = new Rule(uid);
 
+        String name = element.getName();
+        if (name == null || name.isEmpty()) {
+            name = element.getClass().toString();
+        }
+
+        rule.setName(name);
+        rule.setDescription(element.getDescription());
+
         try {
             rule.setConditions(element.getConditions());
         } catch (Exception ex) {
