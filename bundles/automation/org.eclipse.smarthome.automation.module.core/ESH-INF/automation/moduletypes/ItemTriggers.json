@@ -128,6 +128,40 @@
                "required":true
             },
             {  
+               "name":"oldState",
+               "type":"TEXT",
+               "label":"State",
+               "description":"the old state of the item",
+               "required":false,
+               "limitToOptions":false,
+               "options":[
+               {
+                  "label": "ON",
+                  "value": "ON"
+               },
+               {
+                  "label": "OFF",
+                  "value": "OFF"
+               },
+               {
+                  "label": "OPEN",
+                  "value": "OPEN"
+               },
+               {
+                  "label": "CLOSED",
+                  "value": "CLOSED"
+               },
+               {
+                  "label": "UP",
+                  "value": "UP"
+               },
+               {
+                  "label": "DOWN",
+                  "value": "DOWN"
+               }
+               ]
+           },
+           {  
                "name":"state",
                "type":"TEXT",
                "label":"State",

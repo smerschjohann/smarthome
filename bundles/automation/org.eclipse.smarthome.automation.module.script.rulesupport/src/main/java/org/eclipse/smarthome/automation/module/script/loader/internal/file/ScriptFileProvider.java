@@ -8,9 +8,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.script.ScriptEngine;
@@ -131,7 +134,18 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
                 @Override
                 public void run() {
                     while (!urls.isEmpty()) {
-                        HashSet<URL> reimportUrls = new HashSet<URL>();
+                        SortedSet<URL> reimportUrls = new TreeSet<URL>(new Comparator<URL>() {
+                            @Override
+                            public int compare(URL o1, URL o2) {
+                                String f1 = o1.getPath();
+                                String s1 = f1.substring(f1.lastIndexOf("/") + 1);
+                                String f2 = o2.getPath();
+                                String s2 = f2.substring(f2.lastIndexOf("/") + 1);
+
+                                return String.CASE_INSENSITIVE_ORDER.compare(s1, s2);
+                            }
+                        });
+
                         synchronized (urls) {
                             HashSet<String> newlySupported = new HashSet<>();
                             for (String key : urls.keySet()) {

@@ -42,6 +42,7 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
 
     private String itemName;
     private String state;
+    private String oldState;
     private Set<String> types;
     private BundleContext bundleContext;
 
@@ -50,6 +51,7 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
 
     private static final String CFG_ITEMNAME = "itemName";
     private static final String CFG_STATE = "state";
+    private static final String CFG_OLD_STATE = "oldState";
 
     @SuppressWarnings("rawtypes")
     private ServiceRegistration eventSubscriberRegistration;
@@ -58,6 +60,7 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
         super(module);
         this.itemName = (String) module.getConfiguration().get(CFG_ITEMNAME);
         this.state = (String) module.getConfiguration().get(CFG_STATE);
+        this.oldState = (String) module.getConfiguration().get(CFG_OLD_STATE);
         this.types = Collections.singleton(
                 UPDATE_MODULE_TYPE_ID.equals(module.getTypeUID()) ? ItemStateEvent.TYPE : ItemStateChangedEvent.TYPE);
         this.bundleContext = bundleContext;
@@ -85,13 +88,15 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
             Map<String, Object> values = Maps.newHashMap();
             if (event instanceof ItemStateEvent && UPDATE_MODULE_TYPE_ID.equals(module.getTypeUID())) {
                 State state = ((ItemStateEvent) event).getItemState();
-                if (this.state == null || this.state.equals(state.toFullString())) {
+                if ((this.state == null || this.state.equals(state.toFullString())) && this.oldState == null) {
                     values.put("state", state);
                 }
             } else if (event instanceof ItemStateChangedEvent && CHANGE_MODULE_TYPE_ID.equals(module.getTypeUID())) {
                 State state = ((ItemStateChangedEvent) event).getItemState();
-                if (this.state == null || this.state.equals(state.toFullString())) {
-                    values.put("oldState", ((ItemStateChangedEvent) event).getOldItemState());
+                State oldState = ((ItemStateChangedEvent) event).getOldItemState();
+                if ((this.state == null || this.state.equals(state.toFullString()))
+                        && (this.oldState == null || this.oldState.equals(oldState.toFullString()))) {
+                    values.put("oldState", oldState);
                     values.put("newState", state);
                 }
             }

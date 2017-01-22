@@ -12,8 +12,10 @@ import java.util.HashSet;
 import java.util.UUID;
 
 import org.eclipse.smarthome.automation.Action;
+import org.eclipse.smarthome.automation.Condition;
 import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleRegistry;
+import org.eclipse.smarthome.automation.Trigger;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.factory.ScriptedModuleHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.LoaderRuleRegistry;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.RuleClassInterface;
@@ -97,8 +99,7 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
 
     @Override
     public Rule addRule(RuleClassInterface element) {
-        String uid = element.getUid() != null ? element.getUid()
-                : element.getClass().getSimpleName() + "_" + UUID.randomUUID();
+        String uid = element.getUid() != null ? element.getUid() : getUniqueId(element);
         Rule rule = new Rule(uid);
 
         String name = element.getName();
@@ -110,12 +111,37 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
         rule.setDescription(element.getDescription());
 
         try {
-            rule.setConditions(element.getConditions());
+            ArrayList<Condition> conditions = new ArrayList<>();
+            for (Condition cond : element.getConditions()) {
+                Condition toAdd = cond;
+                if (cond.getId() == null || cond.getId().isEmpty()) {
+                    toAdd = new Condition(getUniqueId(cond), cond.getTypeUID(), cond.getConfiguration(),
+                            cond.getInputs());
+                }
+
+                conditions.add(toAdd);
+            }
+
+            rule.setConditions(conditions);
         } catch (Exception ex) {
             // conditions are optional
         }
 
-        rule.setTriggers(element.getTriggers());
+        try {
+            ArrayList<Trigger> triggers = new ArrayList<>();
+            for (Trigger trigger : element.getTriggers()) {
+                Trigger toAdd = trigger;
+                if (trigger.getId() == null || trigger.getId().isEmpty()) {
+                    toAdd = new Trigger(getUniqueId(trigger), trigger.getTypeUID(), trigger.getConfiguration());
+                }
+
+                triggers.add(toAdd);
+            }
+
+            rule.setTriggers(triggers);
+        } catch (Exception ex) {
+            // triggers are optional
+        }
 
         ArrayList<Action> actions = new ArrayList<>();
         actions.addAll(element.getActions());
@@ -123,8 +149,7 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
         if (element instanceof SimpleActionHandler) {
             String privId = addPrivateActionHandler((SimpleActionHandler) element);
 
-            Action scriptedAction = new Action(UUID.randomUUID().toString(), "ScriptedAction", new Configuration(),
-                    null);
+            Action scriptedAction = new Action(getUniqueId(element), "ScriptedAction", new Configuration(), null);
             scriptedAction.getConfiguration().put("privId", privId);
             actions.add(scriptedAction);
         }
@@ -133,6 +158,10 @@ public class ScriptedHandlerRegistryImpl implements ScriptedHandlerRegistry {
         ruleRegistry.add(rule);
 
         return rule;
+    }
+
+    private String getUniqueId(Object element) {
+        return element.getClass().getSimpleName().replace("$", "_").replaceAll(" ", "") + "_" + UUID.randomUUID();
     }
 
     @Override
