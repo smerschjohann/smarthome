@@ -21,17 +21,17 @@ import org.eclipse.smarthome.automation.Visibility;
  *
  */
 public interface RuleClassInterface {
-    public List<Trigger> getTriggers();
+    List<Trigger> getTriggers();
 
-    public List<Condition> getConditions();
+    List<Condition> getConditions();
 
-    public List<Action> getActions();
+    List<Action> getActions();
 
-    public String getName();
+    String getName();
 
-    public String getUid();
+    String getUid();
 
-    public String getDescription();
+    String getDescription();
 
-    public Visibility getVisibility();
+    Visibility getVisibility();
 }

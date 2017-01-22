@@ -14,7 +14,6 @@ import java.util.HashMap;
 import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.RuleProvider;
 import org.eclipse.smarthome.core.common.registry.ProviderChangeListener;
-import org.osgi.framework.ServiceRegistration;
 
 /**
  * This RuleProvider keeps Rules at added by scripts during the runtime. This ensures that Rules are not kept on reboot,
@@ -24,8 +23,6 @@ import org.osgi.framework.ServiceRegistration;
  *
  */
 public class ScriptedRuleProvider implements RuleProvider {
-    @SuppressWarnings("rawtypes")
-    private ServiceRegistration providerReg;
     private Collection<ProviderChangeListener<Rule>> listeners = new ArrayList<ProviderChangeListener<Rule>>();
 
     HashMap<String, Rule> rules = new HashMap<>();
