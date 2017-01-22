@@ -1,8 +1,10 @@
 package org.eclipse.smarthome.automation.module.script.loader.internal.file;
 
 import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
@@ -76,14 +78,43 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
 
     private void enqueueUrl(URL url, String scriptType) {
         synchronized (urls) {
-            Set<URL> value = urls.get(scriptType);
-            if (value == null) {
-                value = new HashSet<URL>();
-                urls.put(scriptType, value);
+            Set<URL> set = urls.get(scriptType);
+            if (set == null) {
+                set = new HashSet<URL>();
+                urls.put(scriptType, set);
             }
-            value.add(url);
-            logger.info("in queue: {}", urls);
+            set.add(url);
+            logger.debug("in queue: {}", urls);
         }
+    }
+
+    private void dequeueUrl(URL url) {
+        String scriptType = getScriptType(url);
+
+        if (scriptType != null) {
+            synchronized (urls) {
+                Set<URL> set = urls.get(scriptType);
+                if (set != null) {
+                    set.remove(url);
+                    if (set.isEmpty()) {
+                        urls.remove(scriptType);
+                    }
+                }
+                logger.debug("in queue: {}", urls);
+            }
+        }
+    }
+
+    @Override
+    public void removeResources(File file) {
+        // remove file from import queue as well
+        try {
+            URL url = file.toURI().toURL();
+            dequeueUrl(url);
+        } catch (MalformedURLException e) {
+        }
+
+        super.removeResources(file);
     }
 
     @Override
