@@ -114,19 +114,20 @@ public class ScriptEngineProvider {
             // import default presets from script extensions
 
             boolean isNashorn = isNashorn(engine);
+            ScriptExtensionManager extensionManager = new ScriptExtensionManager(engine);
             for (ScriptExtensionProvider provider : ScriptExtensionManager.getScriptExtensionProviders()) {
                 Collection<String> presets = provider.getDefaultPresets();
                 if (presets.size() > 0) {
                     logger.debug("importing presets: {}", presets);
 
                     for (String preset : presets) {
-                        scopeValues(engine, provider.importPreset(engine.hashCode(), preset), isNashorn);
+                        extensionManager.importPreset(preset);
                     }
                 }
             }
 
             HashMap<String, Object> scriptExtension = new HashMap<>(1);
-            scriptExtension.put("ScriptExtension", new ScriptExtensionManager(engine));
+            scriptExtension.put("ScriptExtension", extensionManager);
             scopeValues(engine, scriptExtension, isNashorn);
 
         } else {
