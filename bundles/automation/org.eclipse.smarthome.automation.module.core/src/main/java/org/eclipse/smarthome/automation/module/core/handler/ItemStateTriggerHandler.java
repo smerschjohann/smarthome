@@ -101,6 +101,7 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
                 }
             }
             if (!values.isEmpty()) {
+                values.put("event", event);
                 ruleEngineCallback.triggered(this.module, values);
             }
         }

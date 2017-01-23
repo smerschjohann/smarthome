@@ -49,13 +49,18 @@
            }
          ],
          "outputs":[
-            {
+           {
                "name":"command",
                "type":"command",
                "description":"the received command",
                "label":"Command"
-            }
-          ]
+           },
+           {
+                "name":"event",
+                "type":"Object",
+                "description": "the processed event"
+           }
+         ]
       },
       {
          "uid":"core.ItemStateUpdateTrigger",
@@ -107,10 +112,15 @@
          ],
          "outputs":[
             {
-               "name":"state",
-               "type":"state",
-               "description":"the item state",
-               "label":"State"
+                "name":"state",
+                "type":"state",
+                "description":"the item state",
+                "label":"State"
+            },
+            {
+                "name":"event",
+                "type":"Object",
+                "description": "the processed event"
             }
           ]
       },
@@ -208,6 +218,11 @@
                "type":"state",
                "description":"the old item state",
                "label":"Old State"
+            },
+            {
+                "name":"event",
+                "type":"Object",
+                "description": "the processed event"
             }
          ]
       }
