@@ -25,29 +25,18 @@ import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider;
  *
  */
 public class ScriptExtensionManager {
-    private ScriptEngine scriptEngine;
+    private Set<ScriptExtensionProvider> scriptExtensionProviders = new CopyOnWriteArraySet<ScriptExtensionProvider>();
 
-    private static Set<ScriptExtensionProvider> scriptExtensionProviders = new CopyOnWriteArraySet<ScriptExtensionProvider>();
-
-    public static Set<ScriptExtensionProvider> getScriptExtensionProviders() {
+    public Set<ScriptExtensionProvider> getScriptExtensionProviders() {
         return scriptExtensionProviders;
     }
 
-    public static void addScriptExtensionProvider(ScriptExtensionProvider provider) {
+    public void addScriptExtensionProvider(ScriptExtensionProvider provider) {
         scriptExtensionProviders.add(provider);
     }
 
-    public static void removeScriptExtensionProvider(ScriptExtensionProvider provider) {
+    public void removeScriptExtensionProvider(ScriptExtensionProvider provider) {
         scriptExtensionProviders.remove(provider);
-    }
-
-    public ScriptExtensionManager(ScriptEngine engine) {
-        this.scriptEngine = engine;
-    }
-
-    @Override
-    public void finalize() {
-        dispose(scriptEngine.hashCode());
     }
 
     public List<String> getTypes() {
@@ -70,29 +59,47 @@ public class ScriptExtensionManager {
         return presets;
     }
 
-    public Object get(String type) {
+    public Object get(String type, String scriptIdentifier) {
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
             if (provider.getTypes().contains(type)) {
-                return provider.get(scriptEngine.hashCode(), type);
+                return provider.get(scriptIdentifier, type);
             }
         }
 
         return null;
     }
 
-    public void importPreset(String preset) {
+    public List<String> getDefaultPresets() {
+        ArrayList<String> defaultPresets = new ArrayList<>();
+
+        for (ScriptExtensionProvider provider : scriptExtensionProviders) {
+            defaultPresets.addAll(provider.getDefaultPresets());
+        }
+
+        return defaultPresets;
+    }
+
+    public void importDefaultPresets(ScriptEngineProvider engineProvider, ScriptEngine scriptEngine,
+            String scriptIdentifier) {
+        for (String preset : getDefaultPresets()) {
+            importPreset(preset, engineProvider, scriptEngine, scriptIdentifier);
+        }
+    }
+
+    public void importPreset(String preset, ScriptEngineProvider engineProvider, ScriptEngine scriptEngine,
+            String scriptIdentifier) {
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
             if (provider.getPresets().contains(preset)) {
-                Map<String, Object> scopeValues = provider.importPreset(scriptEngine.hashCode(), preset);
+                Map<String, Object> scopeValues = provider.importPreset(scriptIdentifier, preset);
 
-                ScriptEngineProvider.scopeValues(scriptEngine, scopeValues);
+                engineProvider.scopeValues(scriptEngine, scopeValues);
             }
         }
     }
 
-    public static void dispose(int scriptEngineId) {
+    public void dispose(String scriptIdentifier) {
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
-            provider.unLoad(scriptEngineId);
+            provider.unLoad(scriptIdentifier);
         }
     }
 

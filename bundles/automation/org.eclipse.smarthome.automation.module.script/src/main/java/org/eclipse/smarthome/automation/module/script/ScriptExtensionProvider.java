@@ -48,7 +48,7 @@ public interface ScriptExtensionProvider {
      * @param type
      * @return
      */
-    public Object get(int scriptEngineId, String type);
+    public Object get(String scriptIdentifier, String type);
 
     /**
      * This method should return variables and types of the concrete type which will be injected into the ScriptEngines
@@ -56,7 +56,7 @@ public interface ScriptExtensionProvider {
      *
      * @param scriptEngineId - the script engine which will receive the preset
      */
-    public Map<String, Object> importPreset(int scriptEngineId, String preset);
+    public Map<String, Object> importPreset(String scriptIdentifier, String preset);
 
     /**
      * This will be called when the ScriptEngine will be unloaded (e.g. if the Script is deleted or updated).
@@ -64,6 +64,6 @@ public interface ScriptExtensionProvider {
      *
      * @param scriptEngineId
      */
-    public void unLoad(int scriptEngineId);
+    public void unLoad(String scriptIdentifier);
 
 }

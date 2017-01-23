@@ -16,19 +16,17 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.script.ScriptEngine;
-
-import org.eclipse.smarthome.automation.module.script.ScriptManager;
-import org.eclipse.smarthome.automation.module.script.loader.internal.ScriptContainer;
+import org.eclipse.smarthome.automation.module.script.ScriptEngineContainer;
+import org.eclipse.smarthome.automation.module.script.ScriptEngineManager;
 import org.eclipse.smarthome.core.service.file.AbstractFileProvider;
 
-public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptContainer> {
+public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptEngineContainer> {
 
     protected static final long RECHECK_INTERVAL = 20 * 1000;
 
     private long earliestStart = System.currentTimeMillis() + 20 * 1000;
 
-    private ScriptManager manager;
+    private ScriptEngineManager manager;
 
     private Map<String, Set<URL>> urls = new ConcurrentHashMap<String, Set<URL>>();
 
@@ -38,7 +36,7 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
         super(root, new String[] { "automation" });
     }
 
-    public void setScriptManager(ScriptManager manager) {
+    public void setScriptEngineManager(ScriptEngineManager manager) {
         this.manager = manager;
     }
 
@@ -58,11 +56,14 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
                 if (manager.isSupported(scriptType)) {
                     try (InputStreamReader reader = new InputStreamReader(new BufferedInputStream(url.openStream()))) {
                         logger.info("script loading: {}", url.toString());
-                        ScriptEngine engine = manager.loadScript(url.toString(), reader);
 
-                        if (engine != null) {
+                        ScriptEngineContainer container = manager.createScriptEngine(scriptType, url.toString());
+
+                        if (container != null) {
+                            manager.loadScript(container.getIdentifier(), reader);
+
                             logger.debug("script successfully loaded: {}", url.toString());
-                            updateProvidedObjectsHolder(url, Collections.singleton(new ScriptContainer(url, engine)));
+                            updateProvidedObjectsHolder(url, Collections.singleton(container));
                         } else {
                             logger.error("script ERROR, ignore file: {}", url);
                         }
@@ -121,9 +122,9 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
     }
 
     @Override
-    protected void notifyListeners(ScriptContainer removedObject) {
+    protected void notifyListeners(ScriptEngineContainer removedObject) {
         if (removedObject != null) {
-            manager.unloadScript(removedObject.getScriptEngine());
+            manager.removeEngine(removedObject.getIdentifier());
         }
         super.notifyListeners(removedObject);
     }
@@ -178,12 +179,12 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptCont
     }
 
     @Override
-    protected String getUID(ScriptContainer providedObject) {
-        return providedObject.getUrl().toString();
+    protected String getUID(ScriptEngineContainer providedObject) {
+        return providedObject.getIdentifier();
     }
 
     @Override
-    public Collection<ScriptContainer> getAll() {
+    public Collection<ScriptEngineContainer> getAll() {
         return providedObjectsHolder.values();
     }
 

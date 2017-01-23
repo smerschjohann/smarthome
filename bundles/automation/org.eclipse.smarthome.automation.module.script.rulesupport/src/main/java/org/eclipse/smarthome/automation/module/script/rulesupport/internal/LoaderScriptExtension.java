@@ -56,7 +56,7 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
     private static HashMap<String, Object> staticTypes = new HashMap<>();
     private static HashSet<String> types = new HashSet<String>();
 
-    private ConcurrentHashMap<Integer, HashMap<String, Object>> objectCache = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, HashMap<String, Object>> objectCache = new ConcurrentHashMap<>();
 
     private ScriptedModuleHandlerFactory scriptedModuleHandlerFactory;
 
@@ -139,17 +139,17 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
     }
 
     @Override
-    public Object get(int scriptEngineId, String type) {
+    public Object get(String scriptIdentifier, String type) {
         Object obj = staticTypes.get(type);
         if (obj != null) {
             return obj;
         }
 
-        HashMap<String, Object> objects = objectCache.get(scriptEngineId);
+        HashMap<String, Object> objects = objectCache.get(scriptIdentifier);
 
         if (objects == null) {
             objects = new HashMap<>();
-            objectCache.put(scriptEngineId, objects);
+            objectCache.put(scriptIdentifier, objects);
         }
 
         obj = objects.get(type);
@@ -171,7 +171,7 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
     }
 
     @Override
-    public Map<String, Object> importPreset(int scriptEngineId, String preset) {
+    public Map<String, Object> importPreset(String scriptIdentifier, String preset) {
         Map<String, Object> scopeValues = new HashMap<>();
 
         Collection<String> values = presets.get(preset);
@@ -181,9 +181,9 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         }
 
         if (preset.equals("RuleSupport")) {
-            scopeValues.put("HandlerRegistry", get(scriptEngineId, "HandlerRegistry"));
+            scopeValues.put("HandlerRegistry", get(scriptIdentifier, "HandlerRegistry"));
 
-            Object ruleRegistry = get(scriptEngineId, "RuleRegistry");
+            Object ruleRegistry = get(scriptIdentifier, "RuleRegistry");
             scopeValues.put("RuleRegistry", ruleRegistry);
             scopeValues.put("rules", ruleRegistry);
         }
@@ -192,8 +192,8 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
     }
 
     @Override
-    public void unLoad(int scriptEngineId) {
-        HashMap<String, Object> objects = objectCache.remove(scriptEngineId);
+    public void unLoad(String scriptIdentifier) {
+        HashMap<String, Object> objects = objectCache.remove(scriptIdentifier);
 
         if (objects != null) {
             Object hr = objects.get("HandlerRegistry");

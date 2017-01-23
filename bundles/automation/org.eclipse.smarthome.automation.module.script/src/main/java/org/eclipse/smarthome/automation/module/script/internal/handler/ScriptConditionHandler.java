@@ -8,6 +8,7 @@
 package org.eclipse.smarthome.automation.module.script.internal.handler;
 
 import java.util.Map;
+import java.util.UUID;
 
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
@@ -15,7 +16,8 @@ import javax.script.ScriptException;
 
 import org.eclipse.smarthome.automation.Condition;
 import org.eclipse.smarthome.automation.handler.ConditionHandler;
-import org.eclipse.smarthome.automation.module.script.ScriptEngineProvider;
+import org.eclipse.smarthome.automation.module.script.ScriptEngineContainer;
+import org.eclipse.smarthome.automation.module.script.ScriptEngineManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,8 +33,8 @@ public class ScriptConditionHandler extends AbstractScriptModuleHandler<Conditio
 
     public static final String SCRIPT_CONDITION = "script.ScriptCondition";
 
-    public ScriptConditionHandler(Condition module, ScriptEngineProvider scriptEngineProvider) {
-        super(module, scriptEngineProvider);
+    public ScriptConditionHandler(Condition module, ScriptEngineManager scriptEngineManager) {
+        super(module, scriptEngineManager);
     }
 
     @Override
@@ -41,8 +43,10 @@ public class ScriptConditionHandler extends AbstractScriptModuleHandler<Conditio
         Object script = module.getConfiguration().get(SCRIPT);
         if (type instanceof String) {
             if (script instanceof String) {
-                ScriptEngine engine = scriptEngineProvider.getScriptEngine((String) type);
-                if (engine != null) {
+                String identifier = UUID.randomUUID().toString();
+                ScriptEngineContainer container = scriptEngineManager.createScriptEngine((String) type, identifier);
+                if (container != null) {
+                    ScriptEngine engine = container.getScriptEngine();
                     ScriptContext executionContext = getExecutionContext(engine, context);
                     try {
                         Object returnVal = engine.eval((String) script, executionContext);
@@ -55,7 +59,7 @@ public class ScriptConditionHandler extends AbstractScriptModuleHandler<Conditio
                         logger.error("Script execution failed: {}", e.getMessage());
                     }
 
-                    scriptEngineProvider.removeEngine(engine);
+                    scriptEngineManager.removeEngine(identifier);
                 } else {
                     logger.debug("No engine available for script type '{}' in condition '{}'.",
                             new Object[] { type, module.getId() });
