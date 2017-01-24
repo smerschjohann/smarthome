@@ -25,9 +25,9 @@ import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider;
  *
  */
 public class ScriptExtensionManager {
-    private Set<ScriptExtensionProvider> scriptExtensionProviders = new CopyOnWriteArraySet<ScriptExtensionProvider>();
+    private static Set<ScriptExtensionProvider> scriptExtensionProviders = new CopyOnWriteArraySet<ScriptExtensionProvider>();
 
-    public Set<ScriptExtensionProvider> getScriptExtensionProviders() {
+    public static Set<ScriptExtensionProvider> getScriptExtensionProviders() {
         return scriptExtensionProviders;
     }
 
@@ -39,7 +39,15 @@ public class ScriptExtensionManager {
         scriptExtensionProviders.remove(provider);
     }
 
-    public List<String> getTypes() {
+    public static void addExtension(ScriptExtensionProvider provider) {
+        scriptExtensionProviders.add(provider);
+    }
+
+    public static void removeExtension(ScriptExtensionProvider provider) {
+        scriptExtensionProviders.remove(provider);
+    }
+
+    public static List<String> getTypes() {
         ArrayList<String> types = new ArrayList<>();
 
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
@@ -49,7 +57,7 @@ public class ScriptExtensionManager {
         return types;
     }
 
-    public List<String> getPresets() {
+    public static List<String> getPresets() {
         ArrayList<String> presets = new ArrayList<>();
 
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
@@ -59,7 +67,7 @@ public class ScriptExtensionManager {
         return presets;
     }
 
-    public Object get(String type, String scriptIdentifier) {
+    public static Object get(String type, String scriptIdentifier) {
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
             if (provider.getTypes().contains(type)) {
                 return provider.get(scriptIdentifier, type);
@@ -69,7 +77,7 @@ public class ScriptExtensionManager {
         return null;
     }
 
-    public List<String> getDefaultPresets() {
+    public static List<String> getDefaultPresets() {
         ArrayList<String> defaultPresets = new ArrayList<>();
 
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
@@ -79,14 +87,14 @@ public class ScriptExtensionManager {
         return defaultPresets;
     }
 
-    public void importDefaultPresets(ScriptEngineProvider engineProvider, ScriptEngine scriptEngine,
+    public static void importDefaultPresets(ScriptEngineProvider engineProvider, ScriptEngine scriptEngine,
             String scriptIdentifier) {
         for (String preset : getDefaultPresets()) {
             importPreset(preset, engineProvider, scriptEngine, scriptIdentifier);
         }
     }
 
-    public void importPreset(String preset, ScriptEngineProvider engineProvider, ScriptEngine scriptEngine,
+    public static void importPreset(String preset, ScriptEngineProvider engineProvider, ScriptEngine scriptEngine,
             String scriptIdentifier) {
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
             if (provider.getPresets().contains(preset)) {
@@ -97,7 +105,7 @@ public class ScriptExtensionManager {
         }
     }
 
-    public void dispose(String scriptIdentifier) {
+    public static void dispose(String scriptIdentifier) {
         for (ScriptExtensionProvider provider : scriptExtensionProviders) {
             provider.unLoad(scriptIdentifier);
         }

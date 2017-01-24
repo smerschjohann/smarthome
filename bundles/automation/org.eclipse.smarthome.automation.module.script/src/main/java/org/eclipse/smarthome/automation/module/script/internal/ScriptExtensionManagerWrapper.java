@@ -7,38 +7,37 @@ import org.eclipse.smarthome.automation.module.script.ScriptExtensionProvider;
 
 public class ScriptExtensionManagerWrapper {
     private ScriptEngineContainer container;
-    private ScriptExtensionManager manager;
 
-    public ScriptExtensionManagerWrapper(ScriptEngineContainer container, ScriptExtensionManager manager) {
+    public ScriptExtensionManagerWrapper(ScriptEngineContainer container) {
         this.container = container;
-        this.manager = manager;
     }
 
     public void addScriptExtensionProvider(ScriptExtensionProvider provider) {
-        manager.addScriptExtensionProvider(provider);
+        ScriptExtensionManager.addExtension(provider);
     }
 
     public void removeScriptExtensionProvider(ScriptExtensionProvider provider) {
-        manager.removeScriptExtensionProvider(provider);
+        ScriptExtensionManager.removeExtension(provider);
     }
 
     public List<String> getTypes() {
-        return manager.getTypes();
+        return ScriptExtensionManager.getTypes();
     }
 
     public List<String> getPresets() {
-        return manager.getPresets();
+        return ScriptExtensionManager.getPresets();
     }
 
     public Object get(String type) {
-        return manager.get(type, container.getIdentifier());
+        return ScriptExtensionManager.get(type, container.getIdentifier());
     }
 
     public List<String> getDefaultPresets() {
-        return manager.getDefaultPresets();
+        return ScriptExtensionManager.getDefaultPresets();
     }
 
     public void importPreset(String preset) {
-        manager.importPreset(preset, container.getProvider(), container.getScriptEngine(), container.getIdentifier());
+        ScriptExtensionManager.importPreset(preset, container.getProvider(), container.getScriptEngine(),
+                container.getIdentifier());
     }
 }

@@ -14,6 +14,5 @@
    <service>
      <provide interface="org.eclipse.smarthome.automation.module.script.ScriptEngineManager" />
    </service>
-   <reference bind="setScriptExtensionManager" cardinality="0..1" interface="org.eclipse.smarthome.automation.module.script.internal.ScriptExtensionManager" name="ScriptExtensionManager" policy="static" unbind="unSetScriptExtensionManager"/> 
    <reference bind="addScriptEngineProvider" unbind="removeScriptEngineProvider" cardinality="0..n" interface="org.eclipse.smarthome.automation.module.script.ScriptEngineProvider" name="ScriptEngineProvider" policy="dynamic"/>
 </scr:component>

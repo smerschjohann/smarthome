@@ -36,7 +36,6 @@ public class ScriptEngineManagerImpl implements ScriptEngineManager {
     private HashMap<String, ScriptEngineContainer> loadedScriptEngineInstances = new HashMap<>();
     private HashMap<String, ScriptEngineProvider> supportedLanguages = new HashMap<>();
     private GenericScriptEngineProvider genericProvider = new GenericScriptEngineProvider();
-    private ScriptExtensionManager scriptExtensionManager;
 
     public ScriptEngineManagerImpl() {
         logger.info("ScriptManager loading...");
@@ -55,14 +54,6 @@ public class ScriptEngineManagerImpl implements ScriptEngineManager {
 
     public void removeScriptEngineProvider(ScriptEngineProvider provider) {
         this.scriptEngineProviders.remove(provider);
-    }
-
-    public void setScriptExtensionManager(ScriptExtensionManager scriptExtensionManager) {
-        this.scriptExtensionManager = scriptExtensionManager;
-    }
-
-    public void unsetScriptExtensionManager(ScriptExtensionManager scriptExtensionManager) {
-        this.scriptExtensionManager = null;
     }
 
     @Override
@@ -96,10 +87,9 @@ public class ScriptEngineManagerImpl implements ScriptEngineManager {
                 ScriptEngine engine = engineProvider.createScriptEngine(fileExtension);
                 HashMap<String, Object> scriptExManager = new HashMap<>();
                 result = new ScriptEngineContainer(engine, engineProvider, scriptIdentifier);
-                scriptExManager.put("ScriptExtension",
-                        new ScriptExtensionManagerWrapper(result, scriptExtensionManager));
+                scriptExManager.put("ScriptExtension", new ScriptExtensionManagerWrapper(result));
                 engineProvider.scopeValues(engine, scriptExManager);
-                scriptExtensionManager.importDefaultPresets(engineProvider, engine, scriptIdentifier);
+                ScriptExtensionManager.importDefaultPresets(engineProvider, engine, scriptIdentifier);
 
                 loadedScriptEngineInstances.put(scriptIdentifier, result);
             } catch (Exception ex) {
@@ -162,7 +152,7 @@ public class ScriptEngineManagerImpl implements ScriptEngineManager {
 
     private void removeScriptExtensions(String pathIdentifier) {
         try {
-            scriptExtensionManager.dispose(pathIdentifier);
+            ScriptExtensionManager.dispose(pathIdentifier);
         } catch (Exception ex) {
             logger.error("error removing engine", ex);
         }
