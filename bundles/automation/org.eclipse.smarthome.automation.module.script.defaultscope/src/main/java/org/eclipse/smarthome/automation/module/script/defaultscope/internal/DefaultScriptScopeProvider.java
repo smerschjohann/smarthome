@@ -129,6 +129,8 @@ public class DefaultScriptScopeProvider implements ScriptExtensionProvider {
 
         // services
         elements.put("items", new ItemRegistryDelegate(itemRegistry));
+        elements.put("ir", itemRegistry);
+        elements.put("ItemRegistry", itemRegistry);
         elements.put("things", thingRegistry);
         elements.put("events", busEvent);
         elements.put("rules", ruleRegistry);

@@ -27,6 +27,7 @@ import org.eclipse.smarthome.automation.module.script.rulesupport.internal.share
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedActionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedConditionHandlerFactory;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.modulehandler.ScriptedTriggerHandlerFactory;
+import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.quartz.QuartzScheduler;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.simple.SimpleActionHandler;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.simple.SimpleConditionHandler;
 import org.eclipse.smarthome.automation.module.script.rulesupport.internal.shared.simple.SimpleRule;
@@ -36,6 +37,7 @@ import org.eclipse.smarthome.automation.type.TriggerType;
 import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.items.ItemRegistry;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,8 +86,8 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         staticTypes.put("TriggerType", TriggerType.class);
         staticTypes.put("ConfigDescriptionParameter", ConfigDescriptionParameter.class);
 
-        staticTypes.put("ItemRegistry", null);
-        staticTypes.put("ir", null);
+        staticTypes.put("QuartzScheduler", QuartzScheduler.class);
+        staticTypes.put("DateTime", DateTime.class);
 
         types.addAll(staticTypes.keySet());
 
@@ -94,7 +96,7 @@ public class LoaderScriptExtension implements ScriptExtensionProvider {
         types.add("rules");
 
         presets.put("RuleSupport", Arrays.asList("Configuration", "Action", "Condition", "Trigger", "Rule",
-                "ModuleType", "ActionType", "ItemRegistry", "ir"));
+                "ModuleType", "ActionType", "QuartzScheduler", "DateTime"));
         presets.put("RuleSimple", Arrays.asList("ScriptedRule", "SimpleRule"));
         presets.put("RuleFactories", Arrays.asList("ActionHandlerFactory", "ConditionHandlerFactory",
                 "TriggerHandlerFactory", "TriggerType", "ConfigDescriptionParameter"));
