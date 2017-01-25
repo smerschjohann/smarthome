@@ -65,7 +65,7 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
                 UPDATE_MODULE_TYPE_ID.equals(module.getTypeUID()) ? ItemStateEvent.TYPE : ItemStateChangedEvent.TYPE);
         this.bundleContext = bundleContext;
         Dictionary<String, Object> properties = new Hashtable<String, Object>();
-        properties.put("event.topics", "smarthome/items/*");
+        properties.put("event.topics", "smarthome/items/" + itemName + "/*");
         eventSubscriberRegistration = this.bundleContext.registerService(EventSubscriber.class.getName(), this,
                 properties);
     }
@@ -122,7 +122,7 @@ public class ItemStateTriggerHandler extends BaseTriggerModuleHandler implements
     @Override
     public boolean apply(Event event) {
         logger.trace("->FILTER: {}:{}", event.getTopic(), itemName);
-        return event.getTopic().contains(itemName);
+        return event.getTopic().contains("/" + itemName + "/");
     }
 
 }
