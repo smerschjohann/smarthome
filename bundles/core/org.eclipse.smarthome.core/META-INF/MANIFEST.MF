@@ -16,6 +16,7 @@ Export-Package: org.eclipse.smarthome.core.auth,
  org.eclipse.smarthome.core.net,
  org.eclipse.smarthome.core.scheduler,
  org.eclipse.smarthome.core.service,
+ org.eclipse.smarthome.core.service.file,
  org.eclipse.smarthome.core.storage,
  org.eclipse.smarthome.core.types
 Service-Component: OSGI-INF/*.xml

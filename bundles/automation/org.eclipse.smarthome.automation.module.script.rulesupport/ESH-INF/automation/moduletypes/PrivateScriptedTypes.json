@@ -1,7 +1,7 @@
 {  
    "conditions":[  
       {  
-         "uid":"ScriptedCondition",
+         "uid":"jsr223.ScriptedCondition",
          "label":"Scripted condition",
          "description":"allows the definition of a condition by a script",
          "configDescriptions":[  
@@ -16,7 +16,7 @@
    ],
    "actions":[  
       {  
-         "uid":"ScriptedAction",
+         "uid":"jsr223.ScriptedAction",
          "label":"Scripted action",
          "description":"allows the execution of a method defined by a script",
          "configDescriptions":[  
@@ -34,6 +34,23 @@
                "label":"result",
                "description":"the script result.",
                "reference":""
+            }
+         ]
+      }
+   ],
+   "triggers": [
+    {  
+         "uid":"jsr223.ScriptedTrigger",
+         "label":"Scripted trigger",
+         "description":"allows the execution of a method defined by a script",
+         "outputs":[  
+            {  
+               "name":"triggerOutput",
+               "type":"java.lang.String",
+               "label":"TriggerOutput label",
+               "description":"Text from the trigger",
+               "reference":"consoleInput",
+               "defaultValue":"dtag"
             }
          ]
       }

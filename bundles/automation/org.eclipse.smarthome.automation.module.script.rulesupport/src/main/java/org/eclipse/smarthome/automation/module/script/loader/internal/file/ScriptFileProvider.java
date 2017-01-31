@@ -24,7 +24,7 @@ public abstract class ScriptFileProvider extends AbstractFileProvider<ScriptEngi
 
     protected static final long RECHECK_INTERVAL = 20 * 1000;
 
-    private long earliestStart = System.currentTimeMillis() + 20 * 1000;
+    private long earliestStart = System.currentTimeMillis() + RECHECK_INTERVAL;
 
     private ScriptEngineManager manager;
 

@@ -27,7 +27,6 @@
     <module>org.eclipse.smarthome.core.thing.test</module>
     <module>org.eclipse.smarthome.core.persistence</module>
     <module>org.eclipse.smarthome.core.scheduler</module>
-    <module>org.eclipse.smarthome.core.service</module>
     <module>org.eclipse.smarthome.core.transform</module>
     <module>org.eclipse.smarthome.core.binding.xml</module>
     <module>org.eclipse.smarthome.core.binding.xml.test</module>
